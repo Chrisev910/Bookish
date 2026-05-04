@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿@inject FantasyBooks.Services.CartService Cart
+@{
+    var satchelCount = Cart.GetLines().Sum(l => l.Quantity);
+    var satchelBadge = satchelCount > 99 ? "99+" : satchelCount.ToString();
+}
+<!DOCTYPE html>
 <html lang="en" class="h-full bg-paper">
 <head>
     <meta charset="utf-8" />
@@ -44,7 +49,16 @@
             </a>
             <div class="flex flex-wrap items-center gap-6 sm:gap-10">
                 <a asp-page="/Catalog" class="text-sm font-medium text-ink/70 transition hover:text-gold-600">Shop</a>
-                <a asp-page="/Cart" class="satchel-glow flex h-11 w-11 items-center justify-center rounded-full bg-paper/80 text-xl text-ink shadow-sm ring-1 ring-gold-500/35 transition hover:bg-paper hover:ring-gold-500/55" title="Satchel" aria-label="Open satchel">🎒</a>
+                <a asp-page="/Cart"
+                   class="satchel-glow relative flex h-11 w-11 items-center justify-center rounded-full bg-paper/80 text-xl text-ink shadow-sm ring-1 ring-gold-500/35 transition hover:bg-paper hover:ring-gold-500/55"
+                   title="@(satchelCount > 0 ? $"Satchel ({satchelCount} items)" : "Satchel")"
+                   aria-label="@(satchelCount > 0 ? $"Open satchel, {satchelCount} items" : "Open satchel")">
+                    <span aria-hidden="true">🎒</span>
+                    @if (satchelCount > 0)
+                    {
+                        <span class="absolute -right-0.5 -top-0.5 flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-bold leading-none text-ink ring-2 ring-paper shadow-sm" aria-hidden="true">@satchelBadge</span>
+                    }
+                </a>
             </div>
         </nav>
     </header>
@@ -69,6 +83,13 @@
             </a>
         </div>
     </footer>
+
+    <div id="checkout-loading-overlay" class="checkout-loading-overlay hidden" role="status" aria-live="polite" aria-busy="true">
+        <div class="flex flex-col items-center">
+            <div class="checkout-loading-spinner" aria-hidden="true"></div>
+            <p class="checkout-loading-label">Loading…</p>
+        </div>
+    </div>
 
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)

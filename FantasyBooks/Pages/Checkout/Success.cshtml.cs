@@ -27,7 +27,13 @@ public class SuccessModel : PageModel
         var service = new SessionService(client);
         var checkoutSession = await service.GetAsync(session_id, cancellationToken: cancellationToken);
 
-        if (string.Equals(checkoutSession.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase))
-            _cart.Clear();
+        if (!string.Equals(checkoutSession.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var source = checkoutSession.Metadata?.GetValueOrDefault("checkout_source");
+        if (!string.Equals(source, "cart", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _cart.Clear();
     }
 }

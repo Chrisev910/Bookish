@@ -27,7 +27,7 @@
             {
                 <p class="line-clamp-4 text-sm leading-relaxed text-ink/65">@descPreview</p>
             }
-            <div class="mt-auto border-t border-ink/10 pt-4">
+            <div class="mt-auto flex flex-col gap-2 border-t border-ink/10 pt-4">
                 <form method="post" asp-page="/Catalog" asp-page-handler="AddToCart" class="inline w-full">
                     <input type="hidden" name="productId" value="@Model.Id" />
                     @if (ViewData["CatalogSearch"] is string catalogSearch && !string.IsNullOrWhiteSpace(catalogSearch))
@@ -38,6 +38,16 @@
                         Add to Satchel
                     </button>
                 </form>
+                @if (ViewData["IncludeStripeBuyNow"] is bool showBuyNow && showBuyNow)
+                {
+                    <form asp-controller="Checkout" asp-action="BuyNow" method="post" class="w-full" data-checkout-loading>
+                        <input type="hidden" name="productId" value="@Model.Id" />
+                        <button type="submit"
+                                class="w-full rounded-xl border border-gold-500/50 bg-white/40 px-4 py-3 text-sm font-semibold text-ink shadow-sm backdrop-blur-sm transition hover:border-gold-500 hover:bg-white/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
+                            Buy now
+                        </button>
+                    </form>
+                }
             </div>
         </div>
     </div>

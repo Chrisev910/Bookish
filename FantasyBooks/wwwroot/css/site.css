@@ -72,6 +72,45 @@ body.noise-root {
   background-color: transparent;
 }
 
+.checkout-loading-overlay.hidden {
+  display: none;
+}
+
+.checkout-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 245, 242, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.checkout-loading-spinner {
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 3px solid rgba(197, 160, 89, 0.22);
+  border-top-color: #c5a059;
+  border-radius: 50%;
+  animation: checkout-spin 0.72s linear infinite;
+}
+
+.checkout-loading-label {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #b08d4e;
+}
+
+@keyframes checkout-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes magical-glow-pulse {
   0%,
   100% {

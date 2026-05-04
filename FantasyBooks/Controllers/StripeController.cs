@@ -10,20 +10,24 @@ using Stripe.Checkout;
 
 namespace FantasyBooks.Controllers;
 
+[Route("[controller]/[action]")]
 public class StripeController : Controller
 {
     private readonly StripeOptions _stripe;
     private readonly CartService _cart;
     private readonly LibraryContext _db;
+    private readonly IConfiguration _configuration;
 
     public StripeController(
         IOptions<StripeOptions> stripeOptions,
         CartService cart,
-        LibraryContext db)
+        LibraryContext db,
+        IConfiguration configuration)
     {
         _stripe = stripeOptions.Value;
         _cart = cart;
         _db = db;
+        _configuration = configuration;
     }
 
     [HttpPost]
@@ -32,7 +36,10 @@ public class StripeController : Controller
     {
         if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
         {
-            TempData["CartError"] = "Stripe is not configured. Add Stripe:SecretKey to configuration.";
+            TempData["CartError"] =
+                "Stripe is not configured. Set Stripe:SecretKey (Development: run " +
+                "dotnet user-secrets set \"Stripe:SecretKey\" \"sk_test_...\" in the FantasyBooks folder, " +
+                "or add appsettings.Development.local.json — on Render use environment variable Stripe__SecretKey).";
             return RedirectToPage("/Cart");
         }
 
@@ -51,7 +58,15 @@ public class StripeController : Controller
 
         if (products.Count == 0)
         {
-            TempData["CartError"] = "No matching wares were found in the library.";
+            TempData["CartError"] = "No matching wares were found in the library. Remove stale lines from your satchel or refill the shop.";
+            return RedirectToPage("/Cart");
+        }
+
+        var missingProduct = lines.Any(l => !products.ContainsKey(l.ProductId));
+        if (missingProduct)
+        {
+            TempData["CartError"] =
+                "Some satchel lines no longer match the library (often after an import). Remove those rows on this page, then try checkout again.";
             return RedirectToPage("/Cart");
         }
 
@@ -76,7 +91,7 @@ public class StripeController : Controller
                 Quantity = line.Quantity,
                 PriceData = new SessionLineItemPriceDataOptions
                 {
-                    Currency = "usd",
+                    Currency = "gbp",
                     UnitAmount = unitCents,
                     ProductData = new SessionLineItemPriceDataProductDataOptions
                     {
@@ -93,9 +108,10 @@ public class StripeController : Controller
             return RedirectToPage("/Cart");
         }
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var baseUrl = PublicBaseUrl.Resolve(_configuration, Request);
         var successUrl = $"{baseUrl}/Checkout/Success?session_id={{CHECKOUT_SESSION_ID}}";
         var cancelUrl = $"{baseUrl}/Cart";
+
 
         var idBlob = string.Join('|', tiktokIds.Distinct(StringComparer.OrdinalIgnoreCase));
         if (string.IsNullOrEmpty(idBlob))
@@ -103,6 +119,7 @@ public class StripeController : Controller
 
         var metadata = new Dictionary<string, string>
         {
+            ["checkout_source"] = "cart",
             ["tiktok_product_ids"] = idBlob,
         };
 

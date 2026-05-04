@@ -4,9 +4,16 @@
     ViewData["Title"] = "Order secured";
 }
 
-<div class="mx-auto max-w-lg py-12 text-center">
-    <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100/90 text-3xl shadow-inner ring-2 ring-emerald-200/80">✓</div>
-    <h1 class="font-display text-3xl font-semibold text-ink">Thank you</h1>
-    <p class="mt-4 text-lg leading-relaxed text-ink/60">Your order is confirmed. We&rsquo;ll send details to your email.</p>
-    <a asp-page="/Catalog" class="mt-10 inline-flex rounded-2xl bg-gold-500 px-6 py-3 text-sm font-semibold text-ink transition hover:bg-gold-600">Continue shopping</a>
-</div>
+<section class="mx-auto max-w-lg px-4 py-14 text-center sm:py-20">
+    <div class="rounded-3xl border border-ink/10 bg-white/40 px-6 py-12 shadow-float backdrop-blur-[12px] ring-1 ring-gold-500/15 sm:px-10 sm:py-14">
+        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-gold-600">Bookish Ink &amp; Paper</p>
+        <div class="mx-auto mt-6 flex h-16 w-16 items-center justify-center rounded-full border border-gold-500/35 bg-paper/60 text-3xl shadow-inner ring-1 ring-gold-500/20" aria-hidden="true">✦</div>
+        <h1 class="mx-auto mt-8 max-w-md font-display text-lg font-normal leading-relaxed text-ink/80 sm:text-xl">
+            Your order has been captured by our scribes. A confirmation raven (email) is on its way.
+        </h1>
+        <a asp-page="/Catalog"
+           class="mt-10 inline-flex w-full items-center justify-center rounded-2xl bg-gold-500 px-8 py-3.5 text-sm font-semibold text-ink shadow-lg shadow-gold-500/25 transition hover:bg-gold-600 hover:shadow-xl sm:w-auto">
+            Return to the Library
+        </a>
+    </div>
+</section>

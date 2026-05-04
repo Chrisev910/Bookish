@@ -6,8 +6,16 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
+}
+
+StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"] ?? string.Empty;
 var portEnv = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(portEnv))
     builder.WebHost.UseUrls($"http://0.0.0.0:{portEnv}");
