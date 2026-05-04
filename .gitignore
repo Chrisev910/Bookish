@@ -1,0 +1,20 @@
+# Build
+**/bin/
+**/obj/
+**/out/
+
+# IDE / OS
+.vs/
+.idea/
+*.user
+.DS_Store
+Thumbs.db
+
+# Local SQLite (Render creates its own; do not commit DB files)
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets (use Render env vars)
+appsettings.*.local.json
+*.pfx
