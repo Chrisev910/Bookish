@@ -1,6 +1,6 @@
 ﻿@inject FantasyBooks.Services.CartService Cart
 @{
-    var satchelCount = Cart.GetLines().Sum(l => l.Quantity);
+    var satchelCount = Cart.GetSatchelDisplayCount();
     var satchelBadge = satchelCount > 99 ? "99+" : satchelCount.ToString();
 }
 <!DOCTYPE html>

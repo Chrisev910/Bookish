@@ -2,6 +2,8 @@ using System.Globalization;
 using FantasyBooks.Data;
 using FantasyBooks.Options;
 using FantasyBooks.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
@@ -22,6 +24,19 @@ StripeConfiguration.ApiKey = resolvedStripeSecretKey;
 var portEnv = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(portEnv))
     builder.WebHost.UseUrls($"http://0.0.0.0:{portEnv}");
+
+var dataProtectionKeysDir = Path.Combine(builder.Environment.ContentRootPath, "dp-keys");
+try
+{
+    Directory.CreateDirectory(dataProtectionKeysDir);
+    builder.Services.AddDataProtection()
+        .SetApplicationName("FantasyBooks")
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir));
+}
+catch
+{
+    // If the filesystem is read-only, keys stay ephemeral (antiforgery may break across restarts).
+}
 
 builder.Services.Configure<FormOptions>(options =>
 {
@@ -48,10 +63,18 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromHours(2);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    if (!builder.Environment.IsDevelopment())
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<TikTokIntegrationService>();
+builder.Services.AddAntiforgery(options =>
+{
+    if (!builder.Environment.IsDevelopment())
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
 builder.Services.AddRazorPages();
 builder.Services.AddControllersWithViews();
 
@@ -86,6 +109,8 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<LibraryContext>();
     context.Database.EnsureCreated();
+    await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout = 5000;");
+    await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode = WAL;");
     await LibrarySchemaPatch.ApplyAsync(context);
     SeedData.Initialize(context);
 }

@@ -23,6 +23,19 @@ public class CartService(IHttpContextAccessor httpContextAccessor)
         return list ?? [];
     }
 
+    /// <summary>Header badge count; never throws (layout runs on every page including /Error).</summary>
+    public int GetSatchelDisplayCount()
+    {
+        try
+        {
+            return GetLines().Sum(l => l.Quantity);
+        }
+        catch (InvalidOperationException)
+        {
+            return 0;
+        }
+    }
+
     public void SetLines(IReadOnlyList<CartLine> lines)
     {
         var normalized = lines

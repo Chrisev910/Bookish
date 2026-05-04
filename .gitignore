@@ -15,6 +15,9 @@ Thumbs.db
 *.db-shm
 *.db-wal
 
+# Data Protection key ring (generated per host; do not commit)
+**/dp-keys/
+
 # Secrets (use Render env vars)
 appsettings.*.local.json
 *.pfx
