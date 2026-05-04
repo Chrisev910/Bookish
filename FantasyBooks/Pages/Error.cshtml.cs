@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -22,6 +23,9 @@ public class ErrorModel : PageModel
     public void OnGet()
     {
         RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+        var feature = HttpContext.Features.Get<IExceptionHandlerPathFeature>();
+        if (feature?.Error is { } ex)
+            _logger.LogError(ex, "Unhandled exception for {Path}", feature.Path);
     }
 }
 

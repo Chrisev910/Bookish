@@ -5,6 +5,7 @@ using FantasyBooks.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Stripe;
 using Stripe.Checkout;
 
@@ -16,15 +17,18 @@ public class StripeController : Controller
     private readonly CartService _cart;
     private readonly LibraryContext _db;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<StripeController> _logger;
 
     public StripeController(
         CartService cart,
         LibraryContext db,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ILogger<StripeController> logger)
     {
         _cart = cart;
         _db = db;
         _configuration = configuration;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -143,6 +147,12 @@ public class StripeController : Controller
         catch (StripeException ex)
         {
             TempData["CartError"] = $"Stripe: {ex.Message}";
+            return RedirectToPage("/Cart");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error creating Stripe checkout session.");
+            TempData["CartError"] = "Checkout failed. Please try again.";
             return RedirectToPage("/Cart");
         }
 

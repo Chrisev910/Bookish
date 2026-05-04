@@ -4,6 +4,7 @@ using FantasyBooks.Options;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Stripe;
 using Stripe.Checkout;
 
@@ -14,11 +15,13 @@ public class CheckoutController : Controller
 {
     private readonly LibraryContext _db;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<CheckoutController> _logger;
 
-    public CheckoutController(LibraryContext db, IConfiguration configuration)
+    public CheckoutController(LibraryContext db, IConfiguration configuration, ILogger<CheckoutController> logger)
     {
         _db = db;
         _configuration = configuration;
+        _logger = logger;
     }
 
     /// <summary>Starts Stripe Checkout for a single catalog product (Buy now).</summary>
@@ -106,6 +109,12 @@ public class CheckoutController : Controller
         catch (StripeException ex)
         {
             TempData["FlashMessage"] = $"Stripe: {ex.Message}";
+            return RedirectToPage("/Catalog");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error creating Stripe buy-now session.");
+            TempData["FlashMessage"] = "Checkout failed. Please try again.";
             return RedirectToPage("/Catalog");
         }
     }

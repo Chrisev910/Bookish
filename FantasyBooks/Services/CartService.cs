@@ -81,6 +81,16 @@ public class CartService(IHttpContextAccessor httpContextAccessor)
 
     public void Clear()
     {
-        Session.Remove(SessionKey);
+        try
+        {
+            var http = httpContextAccessor.HttpContext;
+            if (http?.Session is null)
+                return;
+            http.Session.Remove(SessionKey);
+        }
+        catch (InvalidOperationException)
+        {
+            // Session may be unavailable on some return-from-Stripe requests; clearing is best-effort.
+        }
     }
 }
