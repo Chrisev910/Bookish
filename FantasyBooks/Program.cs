@@ -17,7 +17,7 @@ if (builder.Environment.IsDevelopment())
 
 ApplyStripeFromEnvironment(builder.Configuration);
 
-StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"] ?? string.Empty;
+StripeConfiguration.ApiKey = ResolveStripeSecretKey(builder.Configuration);
 var portEnv = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(portEnv))
     builder.WebHost.UseUrls($"http://0.0.0.0:{portEnv}");
@@ -32,6 +32,26 @@ builder.Services.AddDbContext<LibraryContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Library")));
 
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.PostConfigure<StripeOptions>(opts =>
+{
+    if (string.IsNullOrWhiteSpace(opts.SecretKey))
+    {
+        var sk = Environment.GetEnvironmentVariable("Stripe__SecretKey")
+            ?? Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")
+            ?? Environment.GetEnvironmentVariable("STRIPE__SECRET_KEY");
+        if (!string.IsNullOrWhiteSpace(sk))
+            opts.SecretKey = sk.Trim();
+    }
+
+    if (string.IsNullOrWhiteSpace(opts.PublishableKey))
+    {
+        var pk = Environment.GetEnvironmentVariable("Stripe__PublishableKey")
+            ?? Environment.GetEnvironmentVariable("STRIPE_PUBLISHABLE_KEY")
+            ?? Environment.GetEnvironmentVariable("STRIPE__PUBLISHABLE_KEY");
+        if (!string.IsNullOrWhiteSpace(pk))
+            opts.PublishableKey = pk.Trim();
+    }
+});
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -113,7 +133,7 @@ static void ApplyStripeFromEnvironment(ConfigurationManager config)
             ?? Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")
             ?? Environment.GetEnvironmentVariable("STRIPE__SECRET_KEY");
         if (!string.IsNullOrWhiteSpace(secret))
-            config["Stripe:SecretKey"] = secret.Trim();
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Stripe:SecretKey"] = secret.Trim() });
     }
 
     if (string.IsNullOrWhiteSpace(config["Stripe:PublishableKey"]))
@@ -123,6 +143,18 @@ static void ApplyStripeFromEnvironment(ConfigurationManager config)
             ?? Environment.GetEnvironmentVariable("STRIPE_PUBLISHABLE_KEY")
             ?? Environment.GetEnvironmentVariable("STRIPE__PUBLISHABLE_KEY");
         if (!string.IsNullOrWhiteSpace(pk))
-            config["Stripe:PublishableKey"] = pk.Trim();
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Stripe:PublishableKey"] = pk.Trim() });
     }
+}
+
+static string ResolveStripeSecretKey(ConfigurationManager config)
+{
+    var fromConfig = config["Stripe:SecretKey"];
+    if (!string.IsNullOrWhiteSpace(fromConfig))
+        return fromConfig.Trim();
+
+    var fromEnv = Environment.GetEnvironmentVariable("Stripe__SecretKey")
+        ?? Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")
+        ?? Environment.GetEnvironmentVariable("STRIPE__SECRET_KEY");
+    return string.IsNullOrWhiteSpace(fromEnv) ? string.Empty : fromEnv.Trim();
 }
