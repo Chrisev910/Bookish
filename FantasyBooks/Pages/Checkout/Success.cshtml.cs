@@ -2,28 +2,29 @@ using FantasyBooks.Options;
 using FantasyBooks.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Stripe.Checkout;
 
 namespace FantasyBooks.Pages.Checkout;
 
 public class SuccessModel : PageModel
 {
-    private readonly StripeOptions _stripe;
+    private readonly IConfiguration _configuration;
     private readonly CartService _cart;
 
-    public SuccessModel(IOptions<StripeOptions> stripeOptions, CartService cart)
+    public SuccessModel(IConfiguration configuration, CartService cart)
     {
-        _stripe = stripeOptions.Value;
+        _configuration = configuration;
         _cart = cart;
     }
 
     public async Task OnGetAsync([FromQuery] string? session_id, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(session_id) || string.IsNullOrWhiteSpace(_stripe.SecretKey))
+        var secretKey = StripeSecretResolver.ResolveSecretKey(_configuration);
+        if (string.IsNullOrWhiteSpace(session_id) || string.IsNullOrWhiteSpace(secretKey))
             return;
 
-        var client = new Stripe.StripeClient(_stripe.SecretKey);
+        var client = new Stripe.StripeClient(secretKey);
         var service = new SessionService(client);
         var checkoutSession = await service.GetAsync(session_id, cancellationToken: cancellationToken);
 

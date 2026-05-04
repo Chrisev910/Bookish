@@ -17,7 +17,8 @@ if (builder.Environment.IsDevelopment())
 
 ApplyStripeFromEnvironment(builder.Configuration);
 
-StripeConfiguration.ApiKey = ResolveStripeSecretKey(builder.Configuration);
+var resolvedStripeSecretKey = StripeSecretResolver.ResolveSecretKey(builder.Configuration);
+StripeConfiguration.ApiKey = resolvedStripeSecretKey;
 var portEnv = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(portEnv))
     builder.WebHost.UseUrls($"http://0.0.0.0:{portEnv}");
@@ -35,22 +36,10 @@ builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(Strip
 builder.Services.PostConfigure<StripeOptions>(opts =>
 {
     if (string.IsNullOrWhiteSpace(opts.SecretKey))
-    {
-        var sk = Environment.GetEnvironmentVariable("Stripe__SecretKey")
-            ?? Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")
-            ?? Environment.GetEnvironmentVariable("STRIPE__SECRET_KEY");
-        if (!string.IsNullOrWhiteSpace(sk))
-            opts.SecretKey = sk.Trim();
-    }
+        opts.SecretKey = StripeSecretResolver.ResolveSecretKey(builder.Configuration);
 
     if (string.IsNullOrWhiteSpace(opts.PublishableKey))
-    {
-        var pk = Environment.GetEnvironmentVariable("Stripe__PublishableKey")
-            ?? Environment.GetEnvironmentVariable("STRIPE_PUBLISHABLE_KEY")
-            ?? Environment.GetEnvironmentVariable("STRIPE__PUBLISHABLE_KEY");
-        if (!string.IsNullOrWhiteSpace(pk))
-            opts.PublishableKey = pk.Trim();
-    }
+        opts.PublishableKey = StripeSecretResolver.ResolvePublishableKey(builder.Configuration);
 });
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -85,6 +74,13 @@ if (!builder.Environment.IsDevelopment())
 }
 
 var app = builder.Build();
+
+if (string.IsNullOrWhiteSpace(resolvedStripeSecretKey) && app.Environment.IsProduction())
+{
+    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("FantasyBooks.Stripe");
+    logger.LogWarning(
+        "Stripe secret key is missing. Set Stripe__SecretKey or STRIPE_SECRET_KEY (or STRIPE_SECRET_KEY_FILE) on the host, then redeploy.");
+}
 
 using (var scope = app.Services.CreateScope())
 {
@@ -128,33 +124,15 @@ static void ApplyStripeFromEnvironment(ConfigurationManager config)
 {
     if (string.IsNullOrWhiteSpace(config["Stripe:SecretKey"]))
     {
-        var secret =
-            Environment.GetEnvironmentVariable("Stripe__SecretKey")
-            ?? Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")
-            ?? Environment.GetEnvironmentVariable("STRIPE__SECRET_KEY");
+        var secret = StripeSecretResolver.ReadSecretKeyFromEnvAndFile();
         if (!string.IsNullOrWhiteSpace(secret))
-            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Stripe:SecretKey"] = secret.Trim() });
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Stripe:SecretKey"] = secret });
     }
 
     if (string.IsNullOrWhiteSpace(config["Stripe:PublishableKey"]))
     {
-        var pk =
-            Environment.GetEnvironmentVariable("Stripe__PublishableKey")
-            ?? Environment.GetEnvironmentVariable("STRIPE_PUBLISHABLE_KEY")
-            ?? Environment.GetEnvironmentVariable("STRIPE__PUBLISHABLE_KEY");
+        var pk = StripeSecretResolver.ReadPublishableKeyFromEnv();
         if (!string.IsNullOrWhiteSpace(pk))
-            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Stripe:PublishableKey"] = pk.Trim() });
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Stripe:PublishableKey"] = pk });
     }
-}
-
-static string ResolveStripeSecretKey(ConfigurationManager config)
-{
-    var fromConfig = config["Stripe:SecretKey"];
-    if (!string.IsNullOrWhiteSpace(fromConfig))
-        return fromConfig.Trim();
-
-    var fromEnv = Environment.GetEnvironmentVariable("Stripe__SecretKey")
-        ?? Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")
-        ?? Environment.GetEnvironmentVariable("STRIPE__SECRET_KEY");
-    return string.IsNullOrWhiteSpace(fromEnv) ? string.Empty : fromEnv.Trim();
 }

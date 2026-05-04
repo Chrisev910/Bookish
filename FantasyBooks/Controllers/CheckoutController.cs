@@ -3,7 +3,7 @@ using FantasyBooks.Data;
 using FantasyBooks.Options;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
 
@@ -12,13 +12,11 @@ namespace FantasyBooks.Controllers;
 [Route("[controller]/[action]")]
 public class CheckoutController : Controller
 {
-    private readonly StripeOptions _stripe;
     private readonly LibraryContext _db;
     private readonly IConfiguration _configuration;
 
-    public CheckoutController(IOptions<StripeOptions> stripeOptions, LibraryContext db, IConfiguration configuration)
+    public CheckoutController(LibraryContext db, IConfiguration configuration)
     {
-        _stripe = stripeOptions.Value;
         _db = db;
         _configuration = configuration;
     }
@@ -28,10 +26,11 @@ public class CheckoutController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> BuyNow(int productId, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
+        var secretKey = StripeSecretResolver.ResolveSecretKey(_configuration);
+        if (string.IsNullOrWhiteSpace(secretKey))
         {
             TempData["FlashMessage"] =
-                "Stripe is not configured. Set Stripe__SecretKey or STRIPE_SECRET_KEY on the host, or Stripe:SecretKey via user secrets / appsettings.Development.local.json locally.";
+                "Stripe is not configured. Set Stripe__SecretKey or STRIPE_SECRET_KEY (or STRIPE_SECRET_KEY_FILE) on the host, or Stripe:SecretKey via user secrets / appsettings.Development.local.json locally.";
             return RedirectToPage("/Catalog");
         }
 
@@ -91,7 +90,7 @@ public class CheckoutController : Controller
             },
         };
 
-        var client = new StripeClient(_stripe.SecretKey);
+        var client = new StripeClient(secretKey);
         var service = new SessionService(client);
         try
         {

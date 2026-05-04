@@ -4,7 +4,7 @@ using FantasyBooks.Options;
 using FantasyBooks.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
 
@@ -13,18 +13,15 @@ namespace FantasyBooks.Controllers;
 [Route("[controller]/[action]")]
 public class StripeController : Controller
 {
-    private readonly StripeOptions _stripe;
     private readonly CartService _cart;
     private readonly LibraryContext _db;
     private readonly IConfiguration _configuration;
 
     public StripeController(
-        IOptions<StripeOptions> stripeOptions,
         CartService cart,
         LibraryContext db,
         IConfiguration configuration)
     {
-        _stripe = stripeOptions.Value;
         _cart = cart;
         _db = db;
         _configuration = configuration;
@@ -34,11 +31,12 @@ public class StripeController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateCheckoutSession(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
+        var secretKey = StripeSecretResolver.ResolveSecretKey(_configuration);
+        if (string.IsNullOrWhiteSpace(secretKey))
         {
             TempData["CartError"] =
-                "Stripe is not configured. Set a secret key: Render uses Stripe__SecretKey or STRIPE_SECRET_KEY; " +
-                "local dev: dotnet user-secrets set \"Stripe:SecretKey\" \"sk_test_...\" or appsettings.Development.local.json.";
+                "Stripe is not configured. Set a secret key: Render uses Stripe__SecretKey or STRIPE_SECRET_KEY " +
+                "(or STRIPE_SECRET_KEY_FILE); local dev: dotnet user-secrets set \"Stripe:SecretKey\" \"sk_test_...\" or appsettings.Development.local.json.";
             return RedirectToPage("/Cart");
         }
 
@@ -135,7 +133,7 @@ public class StripeController : Controller
             Metadata = metadata,
         };
 
-        var client = new Stripe.StripeClient(_stripe.SecretKey);
+        var client = new Stripe.StripeClient(secretKey);
         var service = new SessionService(client);
         Stripe.Checkout.Session checkoutSession;
         try

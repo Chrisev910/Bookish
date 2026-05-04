@@ -1,7 +1,8 @@
 # Blueprint: https://render.com/docs/blueprint-spec
-# After first deploy, set Stripe keys in the Render dashboard (Environment):
-#   Stripe__SecretKey
-#   Stripe__PublishableKey
+# After first deploy, set Stripe keys in the Render dashboard (Environment), e.g.:
+#   Stripe__SecretKey   or   STRIPE_SECRET_KEY
+#   Stripe__PublishableKey   or   STRIPE_PUBLISHABLE_KEY
+# Optional Docker-style file path: STRIPE_SECRET_KEY_FILE=/run/secrets/stripe_secret
 # SQLite lives on the instance filesystem; data is lost on redeploy unless you add a persistent disk
 # and set ConnectionStrings__Library to e.g. Data Source=/data/library.db
 services:
