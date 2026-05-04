@@ -6,6 +6,22 @@
   background-attachment: fixed;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 500px;
+  height: 500px;
+  background-image: url('/images/dragon-bg.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom right;
+  opacity: 0.15;
+  z-index: -1;
+  pointer-events: none;
+}
+
 @keyframes magical-glow-pulse {
   0%,
   100% {
