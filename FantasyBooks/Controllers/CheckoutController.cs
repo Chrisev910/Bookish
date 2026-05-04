@@ -31,8 +31,7 @@ public class CheckoutController : Controller
         if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
         {
             TempData["FlashMessage"] =
-                "Stripe is not configured. Set Stripe:SecretKey (dotnet user-secrets set \"Stripe:SecretKey\" \"sk_test_...\", " +
-                "appsettings.Development.local.json, or on Render Stripe__SecretKey).";
+                "Stripe is not configured. Set Stripe__SecretKey or STRIPE_SECRET_KEY on the host, or Stripe:SecretKey via user secrets / appsettings.Development.local.json locally.";
             return RedirectToPage("/Catalog");
         }
 

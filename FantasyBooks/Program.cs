@@ -15,6 +15,8 @@ if (builder.Environment.IsDevelopment())
     builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
 }
 
+ApplyStripeFromEnvironment(builder.Configuration);
+
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"] ?? string.Empty;
 var portEnv = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(portEnv))
@@ -101,3 +103,26 @@ app.MapRazorPages()
     .WithStaticAssets();
 
 app.Run();
+
+static void ApplyStripeFromEnvironment(ConfigurationManager config)
+{
+    if (string.IsNullOrWhiteSpace(config["Stripe:SecretKey"]))
+    {
+        var secret =
+            Environment.GetEnvironmentVariable("Stripe__SecretKey")
+            ?? Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")
+            ?? Environment.GetEnvironmentVariable("STRIPE__SECRET_KEY");
+        if (!string.IsNullOrWhiteSpace(secret))
+            config["Stripe:SecretKey"] = secret.Trim();
+    }
+
+    if (string.IsNullOrWhiteSpace(config["Stripe:PublishableKey"]))
+    {
+        var pk =
+            Environment.GetEnvironmentVariable("Stripe__PublishableKey")
+            ?? Environment.GetEnvironmentVariable("STRIPE_PUBLISHABLE_KEY")
+            ?? Environment.GetEnvironmentVariable("STRIPE__PUBLISHABLE_KEY");
+        if (!string.IsNullOrWhiteSpace(pk))
+            config["Stripe:PublishableKey"] = pk.Trim();
+    }
+}

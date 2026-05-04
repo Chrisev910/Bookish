@@ -37,9 +37,8 @@ public class StripeController : Controller
         if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
         {
             TempData["CartError"] =
-                "Stripe is not configured. Set Stripe:SecretKey (Development: run " +
-                "dotnet user-secrets set \"Stripe:SecretKey\" \"sk_test_...\" in the FantasyBooks folder, " +
-                "or add appsettings.Development.local.json — on Render use environment variable Stripe__SecretKey).";
+                "Stripe is not configured. Set a secret key: Render uses Stripe__SecretKey or STRIPE_SECRET_KEY; " +
+                "local dev: dotnet user-secrets set \"Stripe:SecretKey\" \"sk_test_...\" or appsettings.Development.local.json.";
             return RedirectToPage("/Cart");
         }
 
