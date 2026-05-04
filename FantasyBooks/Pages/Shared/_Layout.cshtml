@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="h-full bg-paper">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Bookish Ink &amp; Paper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['"Playfair Display"', 'Georgia', 'serif'],
+                        cinzel: ['Cinzel', 'Georgia', 'serif'],
+                    },
+                    colors: {
+                        ink: '#0f172a',
+                        paper: '#f8f5f2',
+                        gold: {
+                            500: '#c5a059',
+                            600: '#b08d4e',
+                        },
+                    },
+                    boxShadow: {
+                        float: '0 24px 48px -12px rgba(15, 23, 42, 0.06), 0 12px 24px -10px rgba(15, 23, 42, 0.04)',
+                        'float-hover': '0 28px 56px -12px rgba(197, 160, 89, 0.22), 0 18px 36px -12px rgba(197, 160, 89, 0.12), 0 8px 16px -6px rgba(15, 23, 42, 0.06)',
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="noise-root flex min-h-full flex-col bg-paper font-sans text-ink antialiased">
+    <header class="sticky top-0 z-50 border-b border-ink/10 bg-paper/85 backdrop-blur-xl">
+        <nav class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8" aria-label="Main">
+            <a asp-page="/Index" class="font-display text-base font-medium leading-tight tracking-[0.22em] text-ink transition hover:text-gold-600 sm:text-lg sm:tracking-[0.28em]">
+                Bookish Ink <span class="text-gold-500">&amp;</span> Paper
+            </a>
+            <div class="flex flex-wrap items-center gap-6 sm:gap-10">
+                <a asp-page="/Catalog" class="text-sm font-medium text-ink/70 transition hover:text-gold-600">Shop</a>
+                <a asp-page="/Cart" class="satchel-glow flex h-11 w-11 items-center justify-center rounded-full bg-paper/80 text-xl text-ink shadow-sm ring-1 ring-gold-500/35 transition hover:bg-paper hover:ring-gold-500/55" title="Satchel" aria-label="Open satchel">🎒</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 lg:px-8" role="main">
+        @RenderBody()
+    </main>
+
+    <footer class="relative mt-auto border-t border-ink/10 bg-paper/90 pb-16 pt-6 backdrop-blur-md sm:pb-6">
+        <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 text-sm text-ink/55 sm:flex-row sm:px-6 lg:px-8">
+            <span>&copy; 2024 Bookish Ink &amp; Paper</span>
+            <a asp-page="/Privacy" class="font-medium text-ink/70 transition hover:text-gold-600">Privacy</a>
+        </div>
+        <div class="pointer-events-none absolute bottom-3 right-4 flex justify-end sm:right-6 lg:right-8">
+            <a asp-page="/Admin/Import"
+               class="pointer-events-auto inline-flex items-center gap-1.5 rounded border border-double border-ink/20 bg-paper/70 px-2 py-1 font-display text-xs text-ink/40 shadow-sm ring-1 ring-ink/10 backdrop-blur-sm transition-colors hover:border-gold-500/50 hover:text-gold-600 hover:ring-gold-500/25"
+               title="Import &amp; ledger"
+               aria-label="Import and ledger">
+                <span class="select-none text-[10px] leading-none tracking-tighter opacity-70" aria-hidden="true">✦</span>
+                <span class="tracking-wide">Ledger</span>
+                <span class="select-none text-[11px] leading-none opacity-50" aria-hidden="true">⚙</span>
+            </a>
+        </div>
+    </footer>
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

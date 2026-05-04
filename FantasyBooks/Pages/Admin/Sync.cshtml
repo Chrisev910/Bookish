@@ -1,0 +1,68 @@
+@page "/Admin/Sync"
+@model SyncModel
+@{
+    ViewData["Title"] = "TikTok sync";
+}
+
+<div class="mx-auto max-w-3xl">
+    <h1 class="font-display text-3xl font-semibold text-ink">Seller center sync</h1>
+    <p class="mt-3 text-sm leading-relaxed text-ink/60">
+        Paste JSON from TikTok Seller Center, or CSV with <strong class="text-ink">Product Name</strong> and image columns per export.
+        With <strong class="text-ink">CSV</strong> selected, an optional file replaces the textarea for that request.
+    </p>
+</div>
+
+@if (Model.LastResult is { } r)
+{
+    <div class="mx-auto mt-8 max-w-3xl rounded-2xl border px-4 py-4 text-sm shadow-sm backdrop-blur-sm @(r.Ok ? "border-emerald-200/80 bg-emerald-50/80 text-emerald-950" : "border-red-200/80 bg-red-50/80 text-red-950")" role="alert">
+        @if (r.Ok)
+        {
+            <p class="font-semibold">Sync complete — created @r.Created, updated @r.Updated@(r.Skipped > 0 ? $", skipped {r.Skipped}" : "").</p>
+        }
+        else
+        {
+            <p class="font-semibold">Sync did not complete.</p>
+        }
+        @if (r.Messages.Count > 0)
+        {
+            <ul class="mt-2 list-inside list-disc space-y-1">
+                @foreach (var m in r.Messages)
+                {
+                    <li>@m</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+<form method="post" asp-page="/Admin/Sync" enctype="multipart/form-data" class="mx-auto mt-10 max-w-3xl space-y-6">
+    <fieldset>
+        <legend class="text-sm font-semibold text-ink">Format</legend>
+        <div class="mt-3 flex flex-wrap gap-4">
+            <label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-ink/12 bg-white/40 px-4 py-2.5 text-sm font-medium text-ink/80 transition hover:border-gold-500/40">
+                <input type="radio" asp-for="Kind" value="@SyncPayloadKind.Json" class="h-4 w-4 border-ink/25 text-gold-600 focus:ring-gold-500/40" />
+                JSON
+            </label>
+            <label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-ink/12 bg-white/40 px-4 py-2.5 text-sm font-medium text-ink/80 transition hover:border-gold-500/40">
+                <input type="radio" asp-for="Kind" value="@SyncPayloadKind.Csv" class="h-4 w-4 border-ink/25 text-gold-600 focus:ring-gold-500/40" />
+                CSV
+            </label>
+        </div>
+    </fieldset>
+
+    <div>
+        <label asp-for="Payload" class="mb-2 block text-sm font-semibold text-ink">TikTok data</label>
+        <textarea asp-for="Payload" rows="18" class="w-full rounded-2xl border border-ink/12 bg-white/45 px-4 py-3 font-mono text-xs text-ink shadow-inner backdrop-blur-sm placeholder:text-ink/40 focus:border-gold-500/50 focus:outline-none focus:ring-2 focus:ring-gold-500/20" placeholder='[{ "Product Name": "...", "Main Image": "https://..." }] or CSV headers: Product Name, Main Image'></textarea>
+    </div>
+
+    <div>
+        <label asp-for="CsvUpload" class="mb-2 block text-sm font-semibold text-ink">CSV file (optional)</label>
+        <input asp-for="CsvUpload" type="file" accept=".csv,text/csv" class="block w-full cursor-pointer rounded-xl border border-dashed border-ink/15 bg-white/35 px-4 py-3 text-sm text-ink/65 file:mr-4 file:rounded-lg file:border-0 file:bg-ink file:px-4 file:py-2 file:text-sm file:font-semibold file:text-paper hover:border-gold-500/45" />
+    </div>
+
+    <div class="flex flex-wrap items-center gap-4">
+        <button type="submit" class="rounded-2xl bg-gold-500 px-6 py-3 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600">Import to library</button>
+        <a asp-page="/Admin/Import" class="text-sm font-semibold text-ink/70 hover:text-gold-600">Import page</a>
+        <a asp-page="/Catalog" class="text-sm font-semibold text-ink/70 hover:text-gold-600">Back to shop</a>
+    </div>
+</form>

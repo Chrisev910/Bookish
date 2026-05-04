@@ -1,0 +1,46 @@
+@page "/Product/{id:int}"
+@model ProductModel
+@{
+    var p = Model.ProductDetail!;
+    ViewData["Title"] = p.Name;
+}
+
+<div class="mx-auto max-w-3xl">
+    <p class="mb-6">
+        <a asp-page="/Catalog" class="text-sm font-semibold text-ink/70 underline decoration-gold-500/45 underline-offset-2 transition hover:text-gold-600">← Back to the collection</a>
+    </p>
+
+    <article class="overflow-hidden rounded-2xl border border-ink/12 bg-white/35 shadow-float backdrop-blur-[12px]">
+        <div class="relative aspect-[4/3] max-h-[min(52vh,28rem)] w-full overflow-hidden bg-gradient-to-br from-ink/5 to-gold-500/5 sm:aspect-[16/10]">
+            @if (!string.IsNullOrWhiteSpace(p.ImageUrl))
+            {
+                <img src="@p.ImageUrl" alt="" class="h-full w-full object-contain object-center sm:object-cover" />
+            }
+            else
+            {
+                <div class="flex h-full min-h-[14rem] items-center justify-center text-6xl text-ink/15" aria-hidden="true">✦</div>
+            }
+        </div>
+        <div class="space-y-5 p-6 sm:p-8">
+            <header class="space-y-2">
+                <h1 class="font-display text-3xl font-semibold leading-tight text-ink sm:text-4xl">@p.Name</h1>
+                <p class="font-display text-3xl font-semibold tabular-nums text-ink">@p.Price.ToString("C")</p>
+            </header>
+            @if (!string.IsNullOrWhiteSpace(p.Description))
+            {
+                <div class="whitespace-pre-line border-t border-ink/10 pt-5 text-base leading-relaxed text-ink/70">
+                    @HtmlPlainText.FromHtml(p.Description)
+                </div>
+            }
+            <div class="border-t border-ink/10 pt-6">
+                <form method="post" asp-page="/Product" asp-route-id="@p.Id" asp-page-handler="AddToCart" class="flex flex-wrap items-center gap-4">
+                    <input type="hidden" name="productId" value="@p.Id" />
+                    <button type="submit" class="magical-glow-btn rounded-xl bg-gold-500 px-8 py-3.5 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
+                        Add to Satchel
+                    </button>
+                    <a asp-page="/Cart" class="text-sm font-semibold text-ink/70 hover:text-gold-600">View satchel</a>
+                </form>
+            </div>
+        </div>
+    </article>
+</div>

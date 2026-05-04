@@ -1,0 +1,66 @@
+@page "/Catalog"
+@model CatalogModel
+@{
+    ViewData["Title"] = "Shop";
+}
+
+@if (!string.IsNullOrEmpty(Model.FlashMessage))
+{
+    <div class="mb-8 rounded-2xl border border-ink/12 bg-white/50 px-5 py-4 text-sm text-ink shadow-float backdrop-blur-[10px] ring-1 ring-gold-500/20" role="status">
+        @Model.FlashMessage
+    </div>
+}
+
+<section class="mb-14 text-center sm:mb-20">
+    <h1 class="font-cinzel text-3xl font-medium tracking-[0.12em] text-ink sm:text-4xl md:text-[2.75rem]">
+        The Collection
+    </h1>
+    <p class="mx-auto mt-5 max-w-lg font-display text-lg font-normal italic text-ink/55 sm:text-xl">
+        Hand-crafted treasures for the modern reader.
+    </p>
+</section>
+
+<form method="get" asp-page="/Catalog" class="mx-auto mb-16 max-w-xl sm:mb-20" role="search">
+    <label for="catalog-search" class="sr-only">Search by name</label>
+    <div class="relative">
+        <input id="catalog-search"
+               type="search"
+               name="Search"
+               value="@Model.Search"
+               autocomplete="off"
+               placeholder="Search by name…"
+               class="w-full rounded-full border border-gold-500/50 bg-white/40 py-3.5 pl-5 pr-12 text-sm text-ink shadow-sm backdrop-blur-md placeholder:text-ink/40 focus:border-gold-500 focus:bg-white/55 focus:outline-none focus:ring-2 focus:ring-gold-500/20" />
+        <button type="submit"
+                class="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-gold-500 transition hover:bg-gold-500/10 hover:text-gold-600"
+                aria-label="Search">
+            <span class="text-base" aria-hidden="true">⌕</span>
+        </button>
+    </div>
+</form>
+
+@{
+    ViewData["CatalogSearch"] = Model.Search;
+}
+
+@if (Model.Products.Count == 0)
+{
+    <p class="mx-auto max-w-2xl rounded-2xl border border-dashed border-ink/15 bg-white/30 px-6 py-14 text-center text-ink/55 shadow-float backdrop-blur-[10px]">
+        @if (!string.IsNullOrWhiteSpace(Model.Search))
+        {
+            <span>No pieces match &ldquo;@Model.Search&rdquo;. Try another name or <a asp-page="/Catalog" class="font-medium text-ink underline decoration-gold-500/60 underline-offset-2 hover:text-gold-600">view the full collection</a>.</span>
+        }
+        else
+        {
+            <span>The shelves are bare. Add products from <a asp-page="/Admin/Import" class="font-medium text-ink underline decoration-gold-500/60 underline-offset-2 hover:text-gold-600">Import</a> when you&rsquo;re ready.</span>
+        }
+    </p>
+}
+else
+{
+    <div class="grid gap-12 sm:grid-cols-2 sm:gap-14 lg:grid-cols-3 lg:gap-x-16 lg:gap-y-20">
+        @foreach (var p in Model.Products)
+        {
+            <partial name="Shared/_ProductGlassCard" model="p" />
+        }
+    </div>
+}

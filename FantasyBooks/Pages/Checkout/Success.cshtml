@@ -1,0 +1,12 @@
+@page "/Checkout/Success"
+@model SuccessModel
+@{
+    ViewData["Title"] = "Order secured";
+}
+
+<div class="mx-auto max-w-lg py-12 text-center">
+    <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100/90 text-3xl shadow-inner ring-2 ring-emerald-200/80">✓</div>
+    <h1 class="font-display text-3xl font-semibold text-ink">Thank you</h1>
+    <p class="mt-4 text-lg leading-relaxed text-ink/60">Your order is confirmed. We&rsquo;ll send details to your email.</p>
+    <a asp-page="/Catalog" class="mt-10 inline-flex rounded-2xl bg-gold-500 px-6 py-3 text-sm font-semibold text-ink transition hover:bg-gold-600">Continue shopping</a>
+</div>

@@ -1,0 +1,18 @@
+# Blueprint: https://render.com/docs/blueprint-spec
+# After first deploy, set Stripe keys in the Render dashboard (Environment):
+#   Stripe__SecretKey
+#   Stripe__PublishableKey
+# SQLite lives on the instance filesystem; data is lost on redeploy unless you add a persistent disk
+# and set ConnectionStrings__Library to e.g. Data Source=/data/library.db
+services:
+  - type: web
+    name: fantasybooks
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
