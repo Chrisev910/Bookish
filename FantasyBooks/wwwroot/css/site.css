@@ -6,20 +6,70 @@
   background-attachment: fixed;
 }
 
-body::before {
-  content: '';
+/* Negative z-index backdrop must stack inside body or it hides behind <html>’s background. */
+body.noise-root {
+  position: relative;
+  z-index: 0;
+}
+
+.dragon-backdrop {
   position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 500px;
-  height: 500px;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   background-image: url('/images/dragon-bg.png');
-  background-size: contain;
   background-repeat: no-repeat;
-  background-position: bottom right;
-  opacity: 0.15;
-  z-index: -1;
+  background-position: center center;
+  background-size: cover;
+  opacity: 0.35;
+  z-index: -10;
   pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+@media (max-width: 768px) {
+  .dragon-backdrop {
+    background-size: cover;
+    background-position: 85% center;
+    opacity: 0.55;
+    background-attachment: fixed;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Extra inset so copy stays clear of the decorative right edge (layout uses .site-main, not .container) */
+  main.site-main {
+    padding-right: 15%;
+  }
+
+  .product-card {
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(197, 160, 89, 0.2);
+  }
+
+  .product-card .product-card-meta {
+    background-color: rgba(248, 245, 242, 0.88);
+    border-radius: 0.625rem;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.05);
+  }
+
+  .product-card h2,
+  .product-card .product-card-price {
+    text-shadow:
+      0 0 1px rgba(248, 245, 242, 1),
+      0 0 12px rgba(248, 245, 242, 0.9),
+      0 1px 2px rgba(15, 23, 42, 0.12);
+  }
+}
+
+.site-main {
+  background-color: rgba(248, 245, 242, 0.4);
+}
+
+.product-grid {
+  background-color: transparent;
 }
 
 @keyframes magical-glow-pulse {

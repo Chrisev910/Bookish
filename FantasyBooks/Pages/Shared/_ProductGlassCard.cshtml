@@ -5,7 +5,7 @@
 }
 
 <div class="group h-full">
-    <div class="flex h-full flex-col overflow-hidden rounded-2xl border border-ink/12 bg-white/35 shadow-float backdrop-blur-[12px] transition duration-300 ease-out hover:border-gold-500/35 hover:shadow-float-hover">
+    <div class="product-card flex h-full flex-col overflow-hidden rounded-2xl border border-ink/12 bg-white/35 shadow-float backdrop-blur-[12px] transition duration-300 ease-out hover:border-gold-500/35 hover:shadow-float-hover">
         <a asp-page="/Product" asp-route-id="@Model.Id" class="block rounded-t-2xl text-ink no-underline outline-none transition focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
             <div class="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-ink/5 to-gold-500/5">
                 @if (!string.IsNullOrWhiteSpace(Model.ImageUrl))
@@ -17,9 +17,9 @@
                     <div class="flex h-full min-h-[11rem] items-center justify-center text-5xl text-ink/15" aria-hidden="true">✦</div>
                 }
             </div>
-            <div class="space-y-1 px-6 pt-6">
+            <div class="product-card-meta space-y-1 px-6 pt-6 pb-1">
                 <h2 class="font-display text-xl font-semibold leading-snug text-ink group-hover:text-gold-600 sm:text-2xl">@Model.Name</h2>
-                <p class="font-display text-2xl font-semibold tabular-nums text-ink sm:text-3xl">@Model.Price.ToString("C")</p>
+                <p class="product-card-price font-display text-2xl font-semibold tabular-nums text-ink sm:text-3xl">@Model.Price.ToString("C")</p>
             </div>
         </a>
         <div class="flex flex-1 flex-col gap-4 px-6 pb-6 pt-4">
