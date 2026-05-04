@@ -1,8 +1,10 @@
+using System.Globalization;
 using FantasyBooks.Data;
 using FantasyBooks.Options;
 using FantasyBooks.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,6 +35,14 @@ builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<TikTokIntegrationService>();
 builder.Services.AddRazorPages();
 builder.Services.AddControllersWithViews();
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var enGb = CultureInfo.GetCultureInfo("en-GB");
+    options.DefaultRequestCulture = new RequestCulture(enGb);
+    options.SupportedCultures = [enGb];
+    options.SupportedUICultures = [enGb];
+});
 
 if (!builder.Environment.IsDevelopment())
 {
@@ -70,6 +80,8 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseRouting();
+
+app.UseRequestLocalization();
 
 app.UseSession();
 
