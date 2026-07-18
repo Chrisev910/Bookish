@@ -72,6 +72,51 @@ body.noise-root {
   background-color: transparent;
 }
 
+/*
+ * Product image frames — critical CSS (loads before Tailwind CDN) so images
+ * are contained from first paint and don't flash oversized/stretched.
+ */
+.product-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: linear-gradient(
+    to bottom right,
+    rgba(15, 23, 42, 0.05),
+    rgba(197, 160, 89, 0.05)
+  );
+}
+
+.product-media--detail {
+  max-height: min(52vh, 28rem);
+}
+
+@media (min-width: 640px) {
+  .product-media--detail {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+.product-media__img,
+.product-media > img {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.product-media .product-gallery {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+}
+
 .checkout-loading-overlay.hidden {
   display: none;
 }
@@ -281,7 +326,7 @@ body.noise-root {
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transform: scale(1.03) translateX(1.25%);
+  transform: translateX(1.25%);
   transition:
     opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
@@ -290,19 +335,23 @@ body.noise-root {
 
 .product-gallery__slide.is-active {
   opacity: 1;
-  transform: scale(1) translateX(0);
+  transform: translateX(0);
   pointer-events: auto;
   z-index: 1;
 }
 
 .product-gallery__slide.is-exit {
   opacity: 0;
-  transform: scale(0.98) translateX(-2%);
+  transform: translateX(-2%);
 }
 
 .product-gallery__img {
+  display: block;
+  box-sizing: border-box;
   height: 100%;
   width: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   object-position: center;
 }
