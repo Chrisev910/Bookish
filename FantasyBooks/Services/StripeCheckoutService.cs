@@ -26,10 +26,11 @@ public class StripeCheckoutService(
                     "Stripe is not configured. Set STRIPE_SECRET_KEY or Stripe__SecretKey on the host.");
             }
 
-            if (!LooksLikeStripeSecret(secretKey))
+            if (!StripeSecretResolver.LooksLikeStripeSecret(secretKey))
             {
                 return StripeCheckoutResult.Fail(
-                    "Stripe secret key looks invalid (expected sk_test_… or sk_live_…). Check the Render env var.");
+                    "Stripe secret key looks invalid (expected sk_test_… or sk_live_…). "
+                    + $"Render currently has: {StripeSecretResolver.DescribeKeyPrefix(secretKey)}");
             }
 
             if (lines.Count == 0)
@@ -107,10 +108,11 @@ public class StripeCheckoutService(
                     "Stripe is not configured. Set STRIPE_SECRET_KEY or Stripe__SecretKey on the host.");
             }
 
-            if (!LooksLikeStripeSecret(secretKey))
+            if (!StripeSecretResolver.LooksLikeStripeSecret(secretKey))
             {
                 return StripeCheckoutResult.Fail(
-                    "Stripe secret key looks invalid (expected sk_test_… or sk_live_…). Check the Render env var.");
+                    "Stripe secret key looks invalid (expected sk_test_… or sk_live_…). "
+                    + $"Render currently has: {StripeSecretResolver.DescribeKeyPrefix(secretKey)}");
             }
 
             if (productId <= 0)
@@ -222,15 +224,6 @@ public class StripeCheckoutService(
             return stripeInner;
 
         return ex;
-    }
-
-    private static bool LooksLikeStripeSecret(string secretKey)
-    {
-        var key = secretKey.Trim();
-        return key.StartsWith("sk_test_", StringComparison.Ordinal)
-            || key.StartsWith("sk_live_", StringComparison.Ordinal)
-            || key.StartsWith("rk_test_", StringComparison.Ordinal)
-            || key.StartsWith("rk_live_", StringComparison.Ordinal);
     }
 
     private static SessionLineItemOptions BuildLineItem(Models.Product product, int quantity)

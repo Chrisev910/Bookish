@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Configuration;
 
 namespace FantasyBooks.Options;
@@ -32,9 +33,9 @@ public static class StripeSecretResolver
     {
         foreach (var name in SecretKeyEnvVarNames)
         {
-            var v = Environment.GetEnvironmentVariable(name);
+            var v = SanitizeKey(Environment.GetEnvironmentVariable(name));
             if (!string.IsNullOrWhiteSpace(v))
-                return v.Trim();
+                return v;
         }
 
         foreach (var envName in SecretKeyFileEnvVarNames)
@@ -44,7 +45,7 @@ public static class StripeSecretResolver
                 continue;
             try
             {
-                var text = File.ReadAllText(path).Trim();
+                var text = SanitizeKey(File.ReadAllText(path));
                 if (!string.IsNullOrWhiteSpace(text))
                     return text;
             }
@@ -63,17 +64,16 @@ public static class StripeSecretResolver
         if (!string.IsNullOrWhiteSpace(fromEnv))
             return fromEnv;
 
-        var fromConfig = configuration["Stripe:SecretKey"];
-        return string.IsNullOrWhiteSpace(fromConfig) ? string.Empty : fromConfig.Trim();
+        return SanitizeKey(configuration["Stripe:SecretKey"]) ?? string.Empty;
     }
 
     public static string? ReadPublishableKeyFromEnv()
     {
         foreach (var name in PublishableKeyEnvVarNames)
         {
-            var v = Environment.GetEnvironmentVariable(name);
+            var v = SanitizeKey(Environment.GetEnvironmentVariable(name));
             if (!string.IsNullOrWhiteSpace(v))
-                return v.Trim();
+                return v;
         }
 
         return null;
@@ -85,7 +85,71 @@ public static class StripeSecretResolver
         if (!string.IsNullOrWhiteSpace(fromEnv))
             return fromEnv;
 
-        var fromConfig = configuration["Stripe:PublishableKey"];
-        return string.IsNullOrWhiteSpace(fromConfig) ? string.Empty : fromConfig.Trim();
+        return SanitizeKey(configuration["Stripe:PublishableKey"]) ?? string.Empty;
+    }
+
+    /// <summary>Safe one-line hint for logs/UI (never the full secret).</summary>
+    public static string DescribeKeyPrefix(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return "(empty)";
+
+        var cleaned = SanitizeKey(key) ?? key.Trim();
+        if (cleaned.Length == 0)
+            return "(empty)";
+
+        var previewLen = Math.Min(12, cleaned.Length);
+        var preview = cleaned[..previewLen];
+        if (cleaned.StartsWith("pk_", StringComparison.Ordinal))
+            return $"{preview}… (this is a publishable key — use the Secret key sk_… instead)";
+        if (cleaned.StartsWith("whsec_", StringComparison.Ordinal))
+            return $"{preview}… (this is a webhook secret — use the Secret key sk_… instead)";
+
+        return $"{preview}…";
+    }
+
+    public static bool LooksLikeStripeSecret(string? secretKey)
+    {
+        var key = SanitizeKey(secretKey);
+        if (string.IsNullOrEmpty(key))
+            return false;
+
+        return key.StartsWith("sk_test_", StringComparison.Ordinal)
+            || key.StartsWith("sk_live_", StringComparison.Ordinal)
+            || key.StartsWith("rk_test_", StringComparison.Ordinal)
+            || key.StartsWith("rk_live_", StringComparison.Ordinal);
+    }
+
+    /// <summary>Strip quotes, Bearer prefix, and whitespace that Render/dashboard pastes often add.</summary>
+    public static string? SanitizeKey(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        var s = raw.Trim();
+
+        // BOM
+        if (s.Length > 0 && s[0] == '\uFEFF')
+            s = s[1..].Trim();
+
+        if ((s.StartsWith('"') && s.EndsWith('"')) || (s.StartsWith('\'') && s.EndsWith('\'')))
+            s = s[1..^1].Trim();
+
+        if (s.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            s = s["Bearer ".Length..].Trim();
+
+        // Remove internal whitespace/newlines from accidental multi-line paste
+        if (s.Any(char.IsWhiteSpace))
+        {
+            var sb = new StringBuilder(s.Length);
+            foreach (var ch in s)
+            {
+                if (!char.IsWhiteSpace(ch))
+                    sb.Append(ch);
+            }
+            s = sb.ToString();
+        }
+
+        return string.IsNullOrEmpty(s) ? null : s;
     }
 }
