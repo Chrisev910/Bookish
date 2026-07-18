@@ -1,9 +1,11 @@
 # Blueprint: https://render.com/docs/blueprint-spec
 #
-# After first deploy, set in the Render dashboard (Environment):
-#   Stripe__SecretKey   or   STRIPE_SECRET_KEY
-#   Stripe__PublishableKey   or   STRIPE_PUBLISHABLE_KEY
+# Stripe (Render → Environment). Use two underscores, not a colon.
+#   Stripe__SecretKey        or   STRIPE_SECRET_KEY        → sk_test_… or sk_live_…
+#   Stripe__PublishableKey   or   STRIPE_PUBLISHABLE_KEY   → pk_test_… or pk_live_… (same mode)
 # Optional Docker-style file path: STRIPE_SECRET_KEY_FILE=/run/secrets/stripe_secret
+# Cutover to client account: replace both keys with the client's (test first, then live),
+# save, Manual Deploy, smoke-test checkout; no webhook secret needed for this app.
 #
 # Persist catalog across redeploys (free): create a Turso database, then set:
 #   TURSO_DATABASE_URL   e.g. libsql://your-db-org.turso.io

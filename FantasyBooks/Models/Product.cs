@@ -21,9 +21,14 @@ public class Product
     /// <summary>Uploaded image bytes persisted in the database (Turso/SQLite BLOB).</summary>
     public byte[]? ImageData { get; set; }
 
+    /// <summary>Bumped when the cover image changes so browsers fetch a fresh <c>/media/products/{id}</c>.</summary>
+    public int ImageRevision { get; set; }
+
     public string? Description { get; set; }
 
     public decimal Price { get; set; }
+
+    public ICollection<ProductGalleryImage> GalleryImages { get; set; } = [];
 
     public bool HasUploadedImage =>
         !string.IsNullOrWhiteSpace(ImageContentType) && ImageData is { Length: > 0 };

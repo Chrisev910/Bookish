@@ -35,6 +35,23 @@ public static class LibrarySchemaPatch
         await EnsureColumnAsync(db, "Products", "ImageContentType", """ALTER TABLE "Products" ADD COLUMN "ImageContentType" TEXT NULL;""", logger, cancellationToken);
         await EnsureColumnAsync(db, "Products", "ImageData", """ALTER TABLE "Products" ADD COLUMN "ImageData" BLOB NULL;""", logger, cancellationToken);
         await EnsureColumnAsync(db, "Products", "TikTokVideoUrl", """ALTER TABLE "Products" ADD COLUMN "TikTokVideoUrl" TEXT NULL;""", logger, cancellationToken);
+        await EnsureColumnAsync(db, "Products", "ImageRevision", """ALTER TABLE "Products" ADD COLUMN "ImageRevision" INTEGER NOT NULL DEFAULT 0;""", logger, cancellationToken);
+
+        await TryExecAsync(
+            db,
+            """
+            CREATE TABLE IF NOT EXISTS "ProductGalleryImages" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ProductGalleryImages" PRIMARY KEY AUTOINCREMENT,
+                "ProductId" INTEGER NOT NULL,
+                "SortOrder" INTEGER NOT NULL DEFAULT 0,
+                "ContentType" TEXT NOT NULL,
+                "ImageData" BLOB NOT NULL,
+                CONSTRAINT "FK_ProductGalleryImages_Products_ProductId"
+                    FOREIGN KEY ("ProductId") REFERENCES "Products" ("Id") ON DELETE CASCADE
+            );
+            """,
+            logger,
+            cancellationToken);
 
         await TryExecAsync(
             db,

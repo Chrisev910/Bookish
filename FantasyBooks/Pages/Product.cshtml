@@ -3,6 +3,8 @@
 @{
     var p = Model.ProductDetail!;
     ViewData["Title"] = p.Name;
+    var slides = Model.GallerySrcs;
+    var multi = slides.Count > 1;
 }
 
 <div class="mx-auto max-w-3xl">
@@ -12,12 +14,47 @@
 
     <article class="overflow-hidden rounded-2xl border border-ink/12 bg-white/35 shadow-float backdrop-blur-[12px]">
         <div class="relative aspect-[4/3] max-h-[min(52vh,28rem)] w-full overflow-hidden bg-gradient-to-br from-ink/5 to-gold-500/5 sm:aspect-[16/10]">
-            @{
-                var imageSrc = ProductImageSrc.Resolve(p);
-            }
-            @if (!string.IsNullOrWhiteSpace(imageSrc))
+            @if (slides.Count > 0)
             {
-                <img src="@imageSrc" alt="" class="h-full w-full object-contain object-center sm:object-cover" />
+                <div class="product-gallery@(multi ? " product-gallery--multi" : "")"
+                     data-product-gallery
+                     @(multi ? "tabindex=\"0\"" : null)
+                     role="@(multi ? "region" : null)"
+                     aria-roledescription="@(multi ? "carousel" : null)"
+                     aria-label="@(multi ? "Product photos" : null)">
+                    <div class="product-gallery__track" data-gallery-track>
+                        @for (var i = 0; i < slides.Count; i++)
+                        {
+                            <div class="product-gallery__slide@(i == 0 ? " is-active" : "")"
+                                 data-gallery-slide
+                                 @(multi ? $"aria-hidden=\"{(i == 0 ? "false" : "true")}\"" : null)>
+                                <img src="@slides[i]" alt="@(i == 0 ? p.Name : $"{p.Name} — photo {i + 1}")"
+                                     class="product-gallery__img"
+                                     @(i == 0 ? null : "loading=\"lazy\"") />
+                            </div>
+                        }
+                    </div>
+                    @if (multi)
+                    {
+                        <button type="button" class="product-gallery__nav product-gallery__nav--prev" data-gallery-prev aria-label="Previous photo">
+                            <span aria-hidden="true">‹</span>
+                        </button>
+                        <button type="button" class="product-gallery__nav product-gallery__nav--next" data-gallery-next aria-label="Next photo">
+                            <span aria-hidden="true">›</span>
+                        </button>
+                        <div class="product-gallery__dots" data-gallery-dots role="tablist" aria-label="Choose photo">
+                            @for (var i = 0; i < slides.Count; i++)
+                            {
+                                <button type="button"
+                                        class="product-gallery__dot@(i == 0 ? " is-active" : "")"
+                                        data-gallery-dot="@i"
+                                        role="tab"
+                                        aria-selected="@(i == 0 ? "true" : "false")"
+                                        aria-label="Photo @(i + 1)"></button>
+                            }
+                        </div>
+                    }
+                </div>
             }
             else
             {

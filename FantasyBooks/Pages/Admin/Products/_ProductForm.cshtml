@@ -42,6 +42,17 @@
         <p class="mt-1 text-xs text-ink/45">Optional fallback if you prefer a link instead of uploading (e.g. TikTok CDN).</p>
     </div>
     <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600">Extra gallery images</label>
+        <input type="file" name="GalleryFiles" multiple
+               accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+               class="block w-full cursor-pointer text-sm text-ink file:mr-4 file:cursor-pointer file:rounded-xl file:border file:border-gold-500/50 file:bg-gold-500/10 file:px-5 file:py-2.5 file:text-sm file:font-semibold file:text-gold-600" />
+        @if (ViewContext.ModelState["GalleryFiles"]?.Errors is { Count: > 0 } galleryErrors)
+        {
+            <span class="mt-1 block text-xs text-red-700">@galleryErrors[0].ErrorMessage</span>
+        }
+        <p class="mt-1 text-xs text-ink/45">Optional — carousel on the product page only (not the shop listing). Up to @FantasyBooks.Services.ProductImageBlobStore.MaxGalleryImagesPerProduct images, 2&nbsp;MB each.</p>
+    </div>
+    <div>
         <label asp-for="Description" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>
         <textarea asp-for="Description" id="Input_Description" rows="3" class="sr-only" tabindex="-1" aria-hidden="true"></textarea>
         <div class="description-quill-wrap overflow-hidden rounded-xl border border-ink/15 bg-white/60">

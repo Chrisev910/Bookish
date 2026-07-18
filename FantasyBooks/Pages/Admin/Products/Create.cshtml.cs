@@ -15,6 +15,9 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
     [BindProperty]
     public IFormFile? ImageFile { get; set; }
 
+    [BindProperty]
+    public List<IFormFile>? GalleryFiles { get; set; }
+
     public void OnGet()
     {
         ViewData["LibraryDatabase"] = dbInfo.Description;
@@ -63,6 +66,17 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
         if (imageData is not null && imageContentType is not null)
         {
             await ProductImageBlobStore.SaveAsync(db, product.Id, imageData, imageContentType, cancellationToken);
+        }
+
+        try
+        {
+            if (GalleryFiles is { Count: > 0 })
+                await ProductImageBlobStore.SaveGalleryUploadsAsync(db, product.Id, GalleryFiles, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["FlashMessage"] = $"Created “{product.Name}”, but a gallery image was skipped: {ex.Message}";
+            return RedirectToPage("./Index");
         }
 
         TempData["FlashMessage"] = $"Created “{Input.Name.Trim()}”.";

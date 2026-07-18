@@ -17,6 +17,8 @@ public class LibraryContext : DbContext
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<ProductGalleryImage> ProductGalleryImages => Set<ProductGalleryImage>();
+
     public DbSet<TikTokVideo> TikTokVideos => Set<TikTokVideo>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -31,6 +33,8 @@ public class LibraryContext : DbContext
 
             entity.Property(e => e.ImageData).HasColumnType("BLOB");
 
+            entity.Property(e => e.ImageRevision).HasColumnType("INTEGER");
+
             entity.Property(e => e.Description).HasColumnType("TEXT");
 
             entity.Property(e => e.TikTokId).HasColumnType("TEXT");
@@ -38,6 +42,21 @@ public class LibraryContext : DbContext
             entity.Property(e => e.TikTokVideoUrl).HasMaxLength(2000).HasColumnType("TEXT");
 
             entity.Property(e => e.Price).HasPrecision(18, 2);
+
+            entity.HasMany(e => e.GalleryImages)
+                .WithOne(e => e.Product!)
+                .HasForeignKey(e => e.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductGalleryImage>(entity =>
+        {
+            entity.ToTable("ProductGalleryImages");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ContentType).IsRequired().HasMaxLength(100).HasColumnType("TEXT");
+            entity.Property(e => e.ImageData).IsRequired().HasColumnType("BLOB");
+            entity.Property(e => e.SortOrder).HasColumnType("INTEGER");
+            entity.HasIndex(e => new { e.ProductId, e.SortOrder });
         });
 
         modelBuilder.Entity<TikTokVideo>(entity =>

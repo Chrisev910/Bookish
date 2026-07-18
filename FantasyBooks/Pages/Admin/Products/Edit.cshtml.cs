@@ -18,6 +18,9 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
     public IFormFile? ImageFile { get; set; }
 
     [BindProperty]
+    public List<IFormFile>? GalleryFiles { get; set; }
+
+    [BindProperty]
     public bool RemoveUploadedImage { get; set; }
 
     public string? CurrentImageSrc { get; private set; }
@@ -35,6 +38,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
                 p.Price,
                 p.ImageUrl,
                 p.ImageContentType,
+                p.ImageRevision,
                 p.TikTokId,
                 p.TikTokVideoUrl,
             })
@@ -54,9 +58,16 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             TikTokVideoUrl = product.TikTokVideoUrl,
         };
         CurrentImageSrc = !string.IsNullOrWhiteSpace(product.ImageContentType)
-            ? $"/media/products/{product.Id}"
+            ? ProductImageSrc.Resolve(new Models.Product
+            {
+                Id = product.Id,
+                ImageContentType = product.ImageContentType,
+                ImageRevision = product.ImageRevision,
+                ImageUrl = product.ImageUrl,
+            })
             : product.ImageUrl;
         ViewData["CurrentImageSrc"] = CurrentImageSrc;
+        await LoadGalleryThumbsAsync(cancellationToken);
         return Page();
     }
 
@@ -82,6 +93,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         if (!ModelState.IsValid)
         {
             CurrentImageSrc = ViewData["CurrentImageSrc"] as string;
+            await LoadGalleryThumbsAsync(cancellationToken);
             return Page();
         }
 
@@ -120,6 +132,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
                 ModelState.AddModelError(nameof(ImageFile), ex.Message);
                 CurrentImageSrc = ProductImageSrc.Resolve(product);
                 ViewData["CurrentImageSrc"] = CurrentImageSrc;
+                await LoadGalleryThumbsAsync(cancellationToken);
                 return Page();
             }
         }
@@ -140,8 +153,44 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         else if (newImageData is not null && newImageContentType is not null)
             await ProductImageBlobStore.SaveAsync(db, product.Id, newImageData, newImageContentType, cancellationToken);
 
+        try
+        {
+            if (GalleryFiles is { Count: > 0 })
+                await ProductImageBlobStore.SaveGalleryUploadsAsync(db, product.Id, GalleryFiles, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["FlashMessage"] = $"Updated “{product.Name}”, but a gallery image was skipped: {ex.Message}";
+            return RedirectToPage("./Index");
+        }
+
         TempData["FlashMessage"] = $"Updated “{product.Name}”.";
         return RedirectToPage("./Index");
+    }
+
+    public async Task<IActionResult> OnPostDeleteGalleryAsync(int galleryImageId, CancellationToken cancellationToken)
+    {
+        if (Id <= 0)
+            return RedirectToPage("./Index");
+
+        await ProductImageBlobStore.DeleteGalleryImageAsync(db, Id, galleryImageId, cancellationToken);
+        TempData["FlashMessage"] = "Gallery image removed.";
+        return RedirectToPage(new { id = Id });
+    }
+
+    private async Task LoadGalleryThumbsAsync(CancellationToken cancellationToken)
+    {
+        var ids = await db.ProductGalleryImages.AsNoTracking()
+            .Where(g => g.ProductId == Id)
+            .OrderBy(g => g.SortOrder)
+            .ThenBy(g => g.Id)
+            .Select(g => g.Id)
+            .ToListAsync(cancellationToken);
+
+        var thumbs = ids
+            .Select(gid => (Id: gid, Src: ProductImageSrc.GallerySrc(Id, gid)))
+            .ToList();
+        ViewData["GalleryThumbs"] = (IReadOnlyList<(int Id, string Src)>)thumbs;
     }
 
     private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

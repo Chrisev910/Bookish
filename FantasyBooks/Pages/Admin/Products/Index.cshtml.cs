@@ -27,6 +27,7 @@ public class IndexModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMod
                 Name = p.Name,
                 ImageUrl = p.ImageUrl,
                 ImageContentType = p.ImageContentType,
+                ImageRevision = p.ImageRevision,
                 Description = p.Description,
                 Price = p.Price,
             })

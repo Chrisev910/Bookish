@@ -15,6 +15,27 @@
     </header>
 
     <partial name="_ProductForm" model="Model.Input" />
+
+    @if (ViewData["GalleryThumbs"] is IReadOnlyList<(int Id, string Src)> thumbs && thumbs.Count > 0)
+    {
+        <section class="rounded-2xl border border-ink/10 bg-white/35 p-6 shadow-float backdrop-blur-[10px] sm:p-8" aria-label="Gallery images">
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-gold-600">Current gallery images</h2>
+            <p class="mt-1 text-xs text-ink/45">These appear after the cover on the product page carousel.</p>
+            <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                @foreach (var thumb in thumbs)
+                {
+                    <li class="overflow-hidden rounded-xl ring-1 ring-ink/10">
+                        <img src="@thumb.Src" alt="" class="aspect-square w-full object-cover" />
+                        <form method="post" asp-page-handler="DeleteGallery" class="border-t border-ink/10 bg-white/50 px-2 py-1.5 text-center">
+                            <input type="hidden" name="Id" value="@Model.Id" />
+                            <input type="hidden" name="galleryImageId" value="@thumb.Id" />
+                            <button type="submit" class="text-xs font-semibold text-ink/55 transition hover:text-red-700">Remove</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
 </div>
 
 @section Scripts {
