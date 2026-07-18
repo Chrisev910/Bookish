@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Nelknet.LibSQL.Data;
 
 namespace FantasyBooks.Data;
 
@@ -20,12 +19,11 @@ public static class LibraryDbContextRegistration
         {
             var dataSource = LibraryDatabase.ToHttpsDataSource(tursoUrl!);
             var authToken = tursoToken!;
-            var connectionString = $"Data Source={dataSource};Auth Token={authToken}";
 
             services.AddDbContext<LibraryContext>((_, options) =>
             {
-                var connection = new LibSQLConnection(connectionString);
-                // EF Core opens/closes the connection per operation; owning it ensures Dispose on context dispose.
+                // Must not put AuthToken in a string that EF/Microsoft.Data.Sqlite parses.
+                var connection = new TursoEfConnection(dataSource, authToken);
                 options.UseSqlite(connection, contextOwnsConnection: true);
             });
         }
