@@ -31,6 +31,10 @@ public static class LibrarySchemaPatch
         await TryExecAsync(db, """ALTER TABLE "Products" ADD COLUMN "ImageContentType" TEXT NULL;""", logger, cancellationToken);
         await TryExecAsync(db, """ALTER TABLE "Products" ADD COLUMN "ImageData" BLOB NULL;""", logger, cancellationToken);
 
+        // Ensure critical image columns exist (ALTER can be skipped silently on some Turso errors).
+        await EnsureColumnAsync(db, "Products", "ImageContentType", """ALTER TABLE "Products" ADD COLUMN "ImageContentType" TEXT NULL;""", logger, cancellationToken);
+        await EnsureColumnAsync(db, "Products", "ImageData", """ALTER TABLE "Products" ADD COLUMN "ImageData" BLOB NULL;""", logger, cancellationToken);
+
         await TryExecAsync(
             db,
             """
@@ -63,10 +67,7 @@ public static class LibrarySchemaPatch
     {
         try
         {
-            var conn = db.Database.GetDbConnection();
-            if (conn.State != ConnectionState.Open)
-                await conn.OpenAsync(cancellationToken);
-
+            var conn = await OpenAsync(db, cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;
             await cmd.ExecuteNonQueryAsync(cancellationToken);
@@ -76,5 +77,69 @@ public static class LibrarySchemaPatch
             // Duplicate column / missing legacy column / Turso DDL quirks — never fail startup.
             logger?.LogWarning(ex, "Schema patch statement skipped: {Sql}", sql.ReplaceLineEndings(" ").Trim());
         }
+    }
+
+    private static async Task EnsureColumnAsync(
+        LibraryContext db,
+        string table,
+        string column,
+        string addColumnSql,
+        ILogger? logger,
+        CancellationToken cancellationToken)
+    {
+        if (await ColumnExistsAsync(db, table, column, cancellationToken))
+            return;
+
+        logger?.LogWarning("Column {Table}.{Column} missing — applying {Sql}", table, column, addColumnSql.Trim());
+        await TryExecAsync(db, addColumnSql, logger, cancellationToken);
+
+        if (!await ColumnExistsAsync(db, table, column, cancellationToken))
+        {
+            logger?.LogError(
+                "Column {Table}.{Column} is still missing after ALTER. Image uploads/caching will fail until the schema is fixed.",
+                table,
+                column);
+        }
+    }
+
+    private static async Task<bool> ColumnExistsAsync(
+        LibraryContext db,
+        string table,
+        string column,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var conn = await OpenAsync(db, cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            // PRAGMA table_info works on SQLite and Turso/libSQL.
+            cmd.CommandText = $"PRAGMA table_info(\"{table}\")";
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                // name is column index 1
+                if (reader.FieldCount > 1
+                    && string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Fall through — caller will attempt ALTER.
+        }
+
+        return false;
+    }
+
+    private static async Task<System.Data.Common.DbConnection> OpenAsync(
+        LibraryContext db,
+        CancellationToken cancellationToken)
+    {
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open)
+            await conn.OpenAsync(cancellationToken);
+        return conn;
     }
 }
