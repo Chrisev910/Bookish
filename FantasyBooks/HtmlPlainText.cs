@@ -36,4 +36,15 @@ public static class HtmlPlainText
             return string.Empty;
         return Regex.Replace(s, @"\s+", " ").Trim();
     }
+
+    /// <summary>
+    /// Plain text for the admin editor / save path: strips HTML from TikTok imports
+    /// and accidental paste, keeps paragraph line breaks.
+    /// </summary>
+    public static string? ForEditor(string? htmlOrPlain)
+    {
+        var plain = FromHtml(htmlOrPlain);
+        return string.IsNullOrWhiteSpace(plain) ? null : plain;
+    }
 }
+

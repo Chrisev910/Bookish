@@ -43,9 +43,11 @@
     </div>
     <div>
         <label asp-for="Description" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>
-        <textarea asp-for="Description" rows="5"
+        <textarea asp-for="Description" rows="8"
+                  placeholder="Write a normal product description. Use blank lines between paragraphs — no HTML needed."
                   class="w-full rounded-xl border border-ink/15 bg-white/60 px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-gold-500/30"></textarea>
         <span asp-validation-for="Description" class="mt-1 block text-xs text-red-700"></span>
+        <p class="mt-1 text-xs text-ink/45">Plain text only. Line breaks are kept on the product page. You do not need HTML tags.</p>
     </div>
     <div>
         <label asp-for="TikTokId" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>

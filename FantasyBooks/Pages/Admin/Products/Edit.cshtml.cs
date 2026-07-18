@@ -45,7 +45,8 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         Input = new CreateModel.ProductInput
         {
             Name = product.Name,
-            Description = product.Description,
+            // TikTok imports store HTML — show readable plain text in the editor.
+            Description = HtmlPlainText.ForEditor(product.Description),
             Price = product.Price,
             ImageUrl = product.ImageUrl,
             TikTokId = product.TikTokId,
@@ -82,7 +83,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         }
 
         product.Name = Input.Name.Trim();
-        product.Description = NullIfEmpty(Input.Description);
+        product.Description = HtmlPlainText.ForEditor(Input.Description);
         product.Price = Input.Price;
         product.TikTokId = NullIfEmpty(Input.TikTokId);
 
