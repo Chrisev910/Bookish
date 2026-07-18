@@ -9,9 +9,19 @@ public class Product
 
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>External image URL (TikTok CDN, etc.). Used when no uploaded file is stored.</summary>
     public string? ImageUrl { get; set; }
+
+    /// <summary>MIME type for <see cref="ImageData"/> (e.g. image/jpeg). Null when no file uploaded.</summary>
+    public string? ImageContentType { get; set; }
+
+    /// <summary>Uploaded image bytes persisted in the database (Turso/SQLite BLOB).</summary>
+    public byte[]? ImageData { get; set; }
 
     public string? Description { get; set; }
 
     public decimal Price { get; set; }
+
+    public bool HasUploadedImage =>
+        !string.IsNullOrWhiteSpace(ImageContentType) && ImageData is { Length: > 0 };
 }

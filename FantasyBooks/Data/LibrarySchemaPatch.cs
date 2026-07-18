@@ -24,6 +24,8 @@ public static class LibrarySchemaPatch
     {
         await AddColumnIfMissingAsync(db, "ImageUrl", """ALTER TABLE "Products" ADD COLUMN "ImageUrl" TEXT NULL;""", cancellationToken);
         await AddColumnIfMissingAsync(db, "TikTokId", """ALTER TABLE "Products" ADD COLUMN "TikTokId" TEXT NULL;""", cancellationToken);
+        await AddColumnIfMissingAsync(db, "ImageContentType", """ALTER TABLE "Products" ADD COLUMN "ImageContentType" TEXT NULL;""", cancellationToken);
+        await AddColumnIfMissingAsync(db, "ImageData", """ALTER TABLE "Products" ADD COLUMN "ImageData" BLOB NULL;""", cancellationToken);
 
         await BackfillTikTokIdsAsync(db, cancellationToken);
 
@@ -42,16 +44,10 @@ public static class LibrarySchemaPatch
         try
         {
             await using var cmd = db.Database.GetDbConnection().CreateCommand();
-            cmd.CommandText = columnName switch
-            {
-                "ImageUrl" => """
-                    SELECT COUNT(1) FROM pragma_table_info('Products') WHERE name='ImageUrl';
-                    """,
-                "TikTokId" => """
-                    SELECT COUNT(1) FROM pragma_table_info('Products') WHERE name='TikTokId';
-                    """,
-                _ => throw new ArgumentOutOfRangeException(nameof(columnName), columnName, null),
-            };
+            var safeName = columnName.Replace("'", "''", StringComparison.Ordinal);
+            cmd.CommandText = $"""
+                SELECT COUNT(1) FROM pragma_table_info('Products') WHERE name='{safeName}';
+                """;
             var scalar = await cmd.ExecuteScalarAsync(cancellationToken);
             hasColumn = Convert.ToInt64(scalar ?? 0L);
         }
@@ -100,7 +96,6 @@ public static class LibrarySchemaPatch
         try
         {
             await using var cmd = db.Database.GetDbConnection().CreateCommand();
-            // columnName is from an internal whitelist only
             cmd.CommandText = $"""
                 SELECT COUNT(1) FROM pragma_table_info('Products') WHERE name='{columnName.Replace("'", "''", StringComparison.Ordinal)}';
                 """;

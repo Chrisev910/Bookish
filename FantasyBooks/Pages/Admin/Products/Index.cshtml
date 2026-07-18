@@ -52,9 +52,12 @@
                         <tr class="text-ink">
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-3">
-                                    @if (!string.IsNullOrWhiteSpace(p.ImageUrl))
+                                    @{
+                                        var thumb = ProductImageSrc.Resolve(p);
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(thumb))
                                     {
-                                        <img src="@p.ImageUrl" alt="" class="h-12 w-12 rounded-lg object-cover ring-1 ring-ink/10" loading="lazy" />
+                                        <img src="@thumb" alt="" class="h-12 w-12 rounded-lg object-cover ring-1 ring-ink/10" loading="lazy" />
                                     }
                                     else
                                     {

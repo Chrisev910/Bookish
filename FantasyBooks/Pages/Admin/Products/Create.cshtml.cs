@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using FantasyBooks.Data;
 using FantasyBooks.Models;
+using FantasyBooks.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -10,6 +11,9 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
 {
     [BindProperty]
     public ProductInput Input { get; set; } = new();
+
+    [BindProperty]
+    public IFormFile? ImageFile { get; set; }
 
     public void OnGet()
     {
@@ -23,12 +27,34 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
         if (!ModelState.IsValid)
             return Page();
 
+        byte[]? imageData = null;
+        string? imageContentType = null;
+        if (ImageFile is { Length: > 0 })
+        {
+            try
+            {
+                var uploaded = await ProductImageUpload.ReadAsync(ImageFile, cancellationToken);
+                if (uploaded is { } u)
+                {
+                    imageData = u.Data;
+                    imageContentType = u.ContentType;
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(nameof(ImageFile), ex.Message);
+                return Page();
+            }
+        }
+
         db.Products.Add(new Product
         {
             Name = Input.Name.Trim(),
             Description = NullIfEmpty(Input.Description),
             Price = Input.Price,
-            ImageUrl = NullIfEmpty(Input.ImageUrl),
+            ImageUrl = imageData is null ? NullIfEmpty(Input.ImageUrl) : null,
+            ImageData = imageData,
+            ImageContentType = imageContentType,
             TikTokId = NullIfEmpty(Input.TikTokId),
         });
         await db.SaveChangesAsync(cancellationToken);
@@ -39,7 +65,7 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
 
     private void ValidateImageUrl()
     {
-        if (string.IsNullOrWhiteSpace(Input.ImageUrl))
+        if (ImageFile is { Length: > 0 } || string.IsNullOrWhiteSpace(Input.ImageUrl))
             return;
         if (!Uri.TryCreate(Input.ImageUrl.Trim(), UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
@@ -66,7 +92,7 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
         [Display(Name = "Price (GBP)")]
         public decimal Price { get; set; }
 
-        [Display(Name = "Image URL")]
+        [Display(Name = "Image URL (optional)")]
         [StringLength(2000)]
         public string? ImageUrl { get; set; }
 

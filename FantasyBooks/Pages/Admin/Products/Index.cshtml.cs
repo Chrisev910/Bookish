@@ -18,7 +18,19 @@ public class IndexModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMod
     {
         FlashMessage = TempData["FlashMessage"] as string;
         ViewData["LibraryDatabase"] = dbInfo.Description;
-        Products = await db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        Products = await db.Products.AsNoTracking()
+            .OrderBy(p => p.Name)
+            .Select(p => new Product
+            {
+                Id = p.Id,
+                TikTokId = p.TikTokId,
+                Name = p.Name,
+                ImageUrl = p.ImageUrl,
+                ImageContentType = p.ImageContentType,
+                Description = p.Description,
+                Price = p.Price,
+            })
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int id, CancellationToken cancellationToken)

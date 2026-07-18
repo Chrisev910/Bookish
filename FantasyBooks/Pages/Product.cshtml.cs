@@ -24,7 +24,18 @@ public class ProductModel : PageModel
     {
         ProductDetail = await _context.Products
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            .Where(p => p.Id == id)
+            .Select(p => new Product
+            {
+                Id = p.Id,
+                TikTokId = p.TikTokId,
+                Name = p.Name,
+                ImageUrl = p.ImageUrl,
+                ImageContentType = p.ImageContentType,
+                Description = p.Description,
+                Price = p.Price,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         return ProductDetail is null ? NotFound() : Page();
     }

@@ -23,6 +23,10 @@ public class LibraryContext : DbContext
 
             entity.Property(e => e.ImageUrl).HasColumnType("TEXT");
 
+            entity.Property(e => e.ImageContentType).HasColumnType("TEXT");
+
+            entity.Property(e => e.ImageData).HasColumnType("BLOB");
+
             entity.Property(e => e.Description).HasColumnType("TEXT");
 
             entity.Property(e => e.TikTokId).HasColumnType("TEXT");

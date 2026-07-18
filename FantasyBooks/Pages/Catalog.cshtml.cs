@@ -47,7 +47,20 @@ public class CatalogModel : PageModel
             query = query.Where(p => p.Name.ToLower().Contains(term.ToLower()));
         }
 
-        Products = await query.OrderBy(p => p.Name).ToListAsync();
+        // Project without ImageData BLOBs (served separately via /media/products/{id}).
+        Products = await query
+            .OrderBy(p => p.Name)
+            .Select(p => new Product
+            {
+                Id = p.Id,
+                TikTokId = p.TikTokId,
+                Name = p.Name,
+                ImageUrl = p.ImageUrl,
+                ImageContentType = p.ImageContentType,
+                Description = p.Description,
+                Price = p.Price,
+            })
+            .ToListAsync();
     }
 
     public IActionResult OnPostAddToCartAsync(int productId, string? search)

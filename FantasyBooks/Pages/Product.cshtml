@@ -12,9 +12,12 @@
 
     <article class="overflow-hidden rounded-2xl border border-ink/12 bg-white/35 shadow-float backdrop-blur-[12px]">
         <div class="relative aspect-[4/3] max-h-[min(52vh,28rem)] w-full overflow-hidden bg-gradient-to-br from-ink/5 to-gold-500/5 sm:aspect-[16/10]">
-            @if (!string.IsNullOrWhiteSpace(p.ImageUrl))
+            @{
+                var imageSrc = ProductImageSrc.Resolve(p);
+            }
+            @if (!string.IsNullOrWhiteSpace(imageSrc))
             {
-                <img src="@p.ImageUrl" alt="" class="h-full w-full object-contain object-center sm:object-cover" />
+                <img src="@imageSrc" alt="" class="h-full w-full object-contain object-center sm:object-cover" />
             }
             else
             {

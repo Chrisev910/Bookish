@@ -1,4 +1,5 @@
 using FantasyBooks.Data;
+using FantasyBooks.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +14,30 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
     [BindProperty]
     public CreateModel.ProductInput Input { get; set; } = new();
 
+    [BindProperty]
+    public IFormFile? ImageFile { get; set; }
+
+    [BindProperty]
+    public bool RemoveUploadedImage { get; set; }
+
+    public string? CurrentImageSrc { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         ViewData["LibraryDatabase"] = dbInfo.Description;
-        var product = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        var product = await db.Products.AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new
+            {
+                p.Id,
+                p.Name,
+                p.Description,
+                p.Price,
+                p.ImageUrl,
+                p.ImageContentType,
+                p.TikTokId,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
         if (product is null)
             return RedirectToPage("./Index");
 
@@ -29,13 +50,18 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             ImageUrl = product.ImageUrl,
             TikTokId = product.TikTokId,
         };
+        CurrentImageSrc = !string.IsNullOrWhiteSpace(product.ImageContentType)
+            ? $"/media/products/{product.Id}"
+            : product.ImageUrl;
+        ViewData["CurrentImageSrc"] = CurrentImageSrc;
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         ViewData["LibraryDatabase"] = dbInfo.Description;
-        if (!string.IsNullOrWhiteSpace(Input.ImageUrl)
+        if (ImageFile is null or { Length: 0 }
+            && !string.IsNullOrWhiteSpace(Input.ImageUrl)
             && (!Uri.TryCreate(Input.ImageUrl.Trim(), UriKind.Absolute, out var uri)
                 || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)))
         {
@@ -43,7 +69,10 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         }
 
         if (!ModelState.IsValid)
+        {
+            CurrentImageSrc = ViewData["CurrentImageSrc"] as string;
             return Page();
+        }
 
         var product = await db.Products.FirstOrDefaultAsync(p => p.Id == Id, cancellationToken);
         if (product is null)
@@ -55,8 +84,42 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         product.Name = Input.Name.Trim();
         product.Description = NullIfEmpty(Input.Description);
         product.Price = Input.Price;
-        product.ImageUrl = NullIfEmpty(Input.ImageUrl);
         product.TikTokId = NullIfEmpty(Input.TikTokId);
+
+        if (RemoveUploadedImage)
+        {
+            product.ImageData = null;
+            product.ImageContentType = null;
+        }
+
+        if (ImageFile is { Length: > 0 })
+        {
+            try
+            {
+                var uploaded = await ProductImageUpload.ReadAsync(ImageFile, cancellationToken);
+                if (uploaded is { } u)
+                {
+                    product.ImageData = u.Data;
+                    product.ImageContentType = u.ContentType;
+                    product.ImageUrl = null;
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(nameof(ImageFile), ex.Message);
+                CurrentImageSrc = ProductImageSrc.Resolve(product);
+                ViewData["CurrentImageSrc"] = CurrentImageSrc;
+                return Page();
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(product.ImageContentType))
+        {
+            product.ImageUrl = NullIfEmpty(Input.ImageUrl);
+        }
+        else if (!string.IsNullOrWhiteSpace(Input.ImageUrl) && product.ImageData is null)
+        {
+            product.ImageUrl = NullIfEmpty(Input.ImageUrl);
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         TempData["FlashMessage"] = $"Updated “{product.Name}”.";
