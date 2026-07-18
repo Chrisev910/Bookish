@@ -104,6 +104,8 @@ public static class StripeSecretResolver
             return $"{preview}… (this is a publishable key — use the Secret key sk_… instead)";
         if (cleaned.StartsWith("whsec_", StringComparison.Ordinal))
             return $"{preview}… (this is a webhook secret — use the Secret key sk_… instead)";
+        if (cleaned.StartsWith("mk_", StringComparison.Ordinal))
+            return $"{preview}… (not an API secret key — open Stripe → Developers → API keys → Secret key, copy sk_test_… or sk_live_…)";
 
         return $"{preview}…";
     }
