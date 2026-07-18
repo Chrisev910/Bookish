@@ -47,17 +47,21 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
             }
         }
 
-        db.Products.Add(new Product
+        var product = new Product
         {
             Name = Input.Name.Trim(),
             Description = DescriptionHtml.Sanitize(Input.Description),
             Price = Input.Price,
             ImageUrl = imageData is null ? NullIfEmpty(Input.ImageUrl) : null,
-            ImageData = imageData,
-            ImageContentType = imageContentType,
             TikTokId = NullIfEmpty(Input.TikTokId),
-        });
+        };
+        db.Products.Add(product);
         await db.SaveChangesAsync(cancellationToken);
+
+        if (imageData is not null && imageContentType is not null)
+        {
+            await ProductImageBlobStore.SaveAsync(db, product.Id, imageData, imageContentType, cancellationToken);
+        }
 
         TempData["FlashMessage"] = $"Created “{Input.Name.Trim()}”.";
         return RedirectToPage("./Index");

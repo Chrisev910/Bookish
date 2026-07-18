@@ -183,35 +183,33 @@ public class ImportModel : PageModel
                 if (product.HasUploadedImage || string.IsNullOrWhiteSpace(product.ImageUrl))
                     continue;
 
-                var url = product.ImageUrl;
+                var url = product.ImageUrl!;
                 try
                 {
-                    var applyError = await _imageFetcher.ApplyAsync(product, url, cancellationToken);
-                    if (applyError is not null)
+                    var (downloaded, downloadError) = await _imageFetcher.TryDownloadAsync(url, cancellationToken);
+                    if (downloaded is null)
                     {
                         failed++;
                         if (failureNotes.Count < 3)
-                            failureNotes.Add($"#{id}: {applyError}");
+                            failureNotes.Add($"#{id}: {downloadError ?? "download failed"}");
                         continue;
                     }
 
-                    await _db.SaveChangesAsync(cancellationToken);
-
-                    if (product.HasUploadedImage)
-                        cached++;
-                    else
-                    {
-                        failed++;
-                        if (failureNotes.Count < 3)
-                            failureNotes.Add($"#{id}: saved but image missing");
-                    }
+                    // Bypass EF byte[] parameter binding (fails on Turso/LibSQL HTTP).
+                    await ProductImageBlobStore.SaveAsync(
+                        _db,
+                        id,
+                        downloaded.Value.Data,
+                        downloaded.Value.ContentType,
+                        cancellationToken);
+                    cached++;
                 }
                 catch (Exception ex)
                 {
                     failed++;
                     _logger.LogError(ex, "Failed caching remote image for product {ProductId}", id);
                     if (failureNotes.Count < 3)
-                        failureNotes.Add($"#{id}: save error — {ex.Message}");
+                        failureNotes.Add($"#{id}: save error — {FormatException(ex)}");
                     DetachAllTracked();
                 }
             }
@@ -246,6 +244,14 @@ public class ImportModel : PageModel
     {
         foreach (var entry in _db.ChangeTracker.Entries().ToList())
             entry.State = EntityState.Detached;
+    }
+
+    private static string FormatException(Exception ex)
+    {
+        var root = ex;
+        while (root.InnerException is not null)
+            root = root.InnerException;
+        return root == ex ? ex.Message : $"{ex.Message} ({root.Message})";
     }
 
     public async Task<IActionResult> OnPostClearAllInventoryAsync(CancellationToken cancellationToken)

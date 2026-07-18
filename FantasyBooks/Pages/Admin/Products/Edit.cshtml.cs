@@ -87,11 +87,9 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         product.Price = Input.Price;
         product.TikTokId = NullIfEmpty(Input.TikTokId);
 
-        if (RemoveUploadedImage)
-        {
-            product.ImageData = null;
-            product.ImageContentType = null;
-        }
+        byte[]? newImageData = null;
+        string? newImageContentType = null;
+        var clearImage = RemoveUploadedImage;
 
         if (ImageFile is { Length: > 0 })
         {
@@ -100,8 +98,9 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
                 var uploaded = await ProductImageUpload.ReadAsync(ImageFile, cancellationToken);
                 if (uploaded is { } u)
                 {
-                    product.ImageData = u.Data;
-                    product.ImageContentType = u.ContentType;
+                    newImageData = u.Data;
+                    newImageContentType = u.ContentType;
+                    clearImage = false;
                     product.ImageUrl = null;
                 }
             }
@@ -113,7 +112,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
                 return Page();
             }
         }
-        else if (string.IsNullOrWhiteSpace(product.ImageContentType))
+        else if (string.IsNullOrWhiteSpace(product.ImageContentType) || clearImage)
         {
             product.ImageUrl = NullIfEmpty(Input.ImageUrl);
         }
@@ -122,7 +121,14 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             product.ImageUrl = NullIfEmpty(Input.ImageUrl);
         }
 
+        // Avoid EF binding ImageData byte[] (breaks on Turso); persist blobs separately.
         await db.SaveChangesAsync(cancellationToken);
+
+        if (clearImage)
+            await ProductImageBlobStore.ClearAsync(db, product.Id, cancellationToken);
+        else if (newImageData is not null && newImageContentType is not null)
+            await ProductImageBlobStore.SaveAsync(db, product.Id, newImageData, newImageContentType, cancellationToken);
+
         TempData["FlashMessage"] = $"Updated “{product.Name}”.";
         return RedirectToPage("./Index");
     }
