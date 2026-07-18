@@ -60,12 +60,19 @@ public class CatalogModel : PageModel
                 ImageRevision = p.ImageRevision,
                 Description = p.Description,
                 Price = p.Price,
+                HasOptions = p.OptionGroups.Any(),
             })
             .ToListAsync();
     }
 
-    public IActionResult OnPostAddToCartAsync(int productId, string? search)
+    public async Task<IActionResult> OnPostAddToCartAsync(int productId, string? search, CancellationToken cancellationToken)
     {
+        if (await ProductHasOptionsAsync(productId, cancellationToken))
+        {
+            TempData["OptionsError"] = "Choose your options, then add this to your satchel.";
+            return RedirectToPage("/Product", new { id = productId });
+        }
+
         _cart.AddItem(productId, 1);
         return string.IsNullOrWhiteSpace(search)
             ? RedirectToPage("/Catalog")
@@ -74,6 +81,12 @@ public class CatalogModel : PageModel
 
     public async Task<IActionResult> OnPostBuyNowAsync(int productId, CancellationToken cancellationToken)
     {
+        if (await ProductHasOptionsAsync(productId, cancellationToken))
+        {
+            TempData["OptionsError"] = "Choose your options before buying.";
+            return RedirectToPage("/Product", new { id = productId });
+        }
+
         try
         {
             var result = await _checkout.CreateBuyNowCheckoutAsync(productId, Request, cancellationToken);
@@ -92,4 +105,7 @@ public class CatalogModel : PageModel
             return RedirectToPage();
         }
     }
+
+    private Task<bool> ProductHasOptionsAsync(int productId, CancellationToken cancellationToken) =>
+        _context.ProductOptionGroups.AsNoTracking().AnyAsync(g => g.ProductId == productId, cancellationToken);
 }

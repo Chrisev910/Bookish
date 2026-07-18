@@ -44,9 +44,9 @@ public class CartModel : PageModel
         await LoadCartAsync();
     }
 
-    public IActionResult OnPostRemoveAsync(int productId)
+    public IActionResult OnPostRemoveAsync(int productId, string? optionsKey)
     {
-        _cart.RemoveItem(productId);
+        _cart.RemoveItem(productId, optionsKey ?? "");
         return RedirectToPage();
     }
 
@@ -106,25 +106,42 @@ public class CartModel : PageModel
             return;
         }
 
-        var ids = cartLines.Select(l => l.ProductId).ToList();
+        var ids = cartLines.Select(l => l.ProductId).Distinct().ToList();
         var products = await _db.Products.AsNoTracking().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
 
         var rows = new List<CartLineView>();
         foreach (var line in cartLines)
         {
+            var optionsKey = ProductOptionsFormat.Signature(line.SelectedOptions);
+            var optionsSummary = ProductOptionsFormat.Summary(line.SelectedOptions);
+
             if (!products.TryGetValue(line.ProductId, out var p))
             {
                 HasInvalidLines = true;
-                rows.Add(new CartLineView(line.ProductId, "No longer in the library (remove to continue)", line.Quantity, 0m, true));
+                rows.Add(new CartLineView(
+                    line.ProductId,
+                    "No longer in the library (remove to continue)",
+                    line.Quantity,
+                    0m,
+                    true,
+                    optionsSummary,
+                    optionsKey));
                 continue;
             }
 
-            rows.Add(new CartLineView(p.Id, p.Name, line.Quantity, p.Price, false));
+            rows.Add(new CartLineView(p.Id, p.Name, line.Quantity, p.Price, false, optionsSummary, optionsKey));
             Subtotal += p.Price * line.Quantity;
         }
 
         Lines = rows;
     }
 
-    public record CartLineView(int ProductId, string Name, int Quantity, decimal UnitPrice, bool IsUnavailable = false);
+    public record CartLineView(
+        int ProductId,
+        string Name,
+        int Quantity,
+        decimal UnitPrice,
+        bool IsUnavailable = false,
+        string OptionsSummary = "",
+        string OptionsKey = "");
 }

@@ -19,6 +19,10 @@ public class LibraryContext : DbContext
 
     public DbSet<ProductGalleryImage> ProductGalleryImages => Set<ProductGalleryImage>();
 
+    public DbSet<ProductOptionGroup> ProductOptionGroups => Set<ProductOptionGroup>();
+
+    public DbSet<ProductOptionChoice> ProductOptionChoices => Set<ProductOptionChoice>();
+
     public DbSet<TikTokVideo> TikTokVideos => Set<TikTokVideo>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -47,6 +51,13 @@ public class LibraryContext : DbContext
                 .WithOne(e => e.Product!)
                 .HasForeignKey(e => e.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.OptionGroups)
+                .WithOne(e => e.Product!)
+                .HasForeignKey(e => e.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Ignore(e => e.HasOptions);
         });
 
         modelBuilder.Entity<ProductGalleryImage>(entity =>
@@ -57,6 +68,28 @@ public class LibraryContext : DbContext
             entity.Property(e => e.ImageData).IsRequired().HasColumnType("BLOB");
             entity.Property(e => e.SortOrder).HasColumnType("INTEGER");
             entity.HasIndex(e => new { e.ProductId, e.SortOrder });
+        });
+
+        modelBuilder.Entity<ProductOptionGroup>(entity =>
+        {
+            entity.ToTable("ProductOptionGroups");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(80).HasColumnType("TEXT");
+            entity.Property(e => e.SortOrder).HasColumnType("INTEGER");
+            entity.HasIndex(e => new { e.ProductId, e.SortOrder });
+            entity.HasMany(e => e.Choices)
+                .WithOne(e => e.Group!)
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductOptionChoice>(entity =>
+        {
+            entity.ToTable("ProductOptionChoices");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Label).IsRequired().HasMaxLength(80).HasColumnType("TEXT");
+            entity.Property(e => e.SortOrder).HasColumnType("INTEGER");
+            entity.HasIndex(e => new { e.GroupId, e.SortOrder });
         });
 
         modelBuilder.Entity<TikTokVideo>(entity =>

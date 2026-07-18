@@ -30,6 +30,11 @@ public class Product
 
     public ICollection<ProductGalleryImage> GalleryImages { get; set; } = [];
 
+    public ICollection<ProductOptionGroup> OptionGroups { get; set; } = [];
+
+    /// <summary>Projection flag for catalog cards (not a DB column).</summary>
+    public bool HasOptions { get; set; }
+
     public bool HasUploadedImage =>
         !string.IsNullOrWhiteSpace(ImageContentType) && ImageData is { Length: > 0 };
 }

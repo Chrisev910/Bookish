@@ -18,17 +18,27 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
     [BindProperty]
     public List<IFormFile>? GalleryFiles { get; set; }
 
+    [BindProperty]
+    public List<ProductOptionStore.GroupInput>? OptionGroups { get; set; }
+
     public void OnGet()
     {
         ViewData["LibraryDatabase"] = dbInfo.Description;
+        ViewData["OptionGroups"] = new List<ProductOptionStore.GroupInput>();
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         ViewData["LibraryDatabase"] = dbInfo.Description;
+        ViewData["OptionGroups"] = OptionGroups ?? [];
         ValidateImageUrl();
         ValidateTikTokVideoUrl();
-        if (!ModelState.IsValid)
+
+        var parsedOptions = ProductOptionStore.ParsePosted(
+            OptionGroups,
+            (key, message) => ModelState.AddModelError("OptionGroups", message));
+
+        if (!ModelState.IsValid || parsedOptions is null)
             return Page();
 
         byte[]? imageData = null;
@@ -78,6 +88,8 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
             TempData["FlashMessage"] = $"Created “{product.Name}”, but a gallery image was skipped: {ex.Message}";
             return RedirectToPage("./Index");
         }
+
+        await ProductOptionStore.ReplaceAsync(db, product.Id, parsedOptions, cancellationToken);
 
         TempData["FlashMessage"] = $"Created “{Input.Name.Trim()}”.";
         return RedirectToPage("./Index");

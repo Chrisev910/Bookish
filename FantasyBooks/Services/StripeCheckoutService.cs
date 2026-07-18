@@ -54,6 +54,38 @@ public class StripeCheckoutService(
                     "Some satchel lines no longer match the library (often after an import). Remove those rows on this page, then try checkout again.");
             }
 
+            var optionGroupsByProduct = await db.ProductOptionGroups.AsNoTracking()
+                .Where(g => productIds.Contains(g.ProductId))
+                .Include(g => g.Choices)
+                .ToListAsync(cancellationToken);
+
+            var groupsLookup = optionGroupsByProduct
+                .GroupBy(g => g.ProductId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyList<ProductOptionGroup>)g
+                        .OrderBy(x => x.SortOrder)
+                        .ThenBy(x => x.Id)
+                        .Select(x =>
+                        {
+                            x.Choices = x.Choices.OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToList();
+                            return x;
+                        })
+                        .ToList());
+
+            foreach (var line in lines)
+            {
+                groupsLookup.TryGetValue(line.ProductId, out var groups);
+                groups ??= [];
+                var selections = ProductOptionsFormat.Normalize(line.SelectedOptions);
+                if (!ProductOptionStore.SelectionsStillValid(groups, selections))
+                {
+                    var name = products.TryGetValue(line.ProductId, out var p) ? p.Name : "an item";
+                    return StripeCheckoutResult.Fail(
+                        $"Options for “{name}” are no longer valid. Remove that line from your satchel and add it again with current choices.");
+                }
+            }
+
             var lineItems = new List<SessionLineItemOptions>();
             var tiktokIds = new List<string>();
 
@@ -65,7 +97,7 @@ public class StripeCheckoutService(
                 if (!string.IsNullOrWhiteSpace(product.TikTokId))
                     tiktokIds.Add(product.TikTokId);
 
-                lineItems.Add(BuildLineItem(product, line.Quantity));
+                lineItems.Add(BuildLineItem(product, line.Quantity, line.SelectedOptions));
             }
 
             if (lineItems.Count == 0)
@@ -97,7 +129,8 @@ public class StripeCheckoutService(
     public async Task<StripeCheckoutResult> CreateBuyNowCheckoutAsync(
         int productId,
         HttpRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<CartOptionSelection>? selectedOptions = null)
     {
         try
         {
@@ -123,11 +156,21 @@ public class StripeCheckoutService(
             if (product is null)
                 return StripeCheckoutResult.Fail("That title could not be found in the library.");
 
+            var groups = await ProductOptionStore.LoadForProductAsync(db, productId, cancellationToken);
+            var selections = ProductOptionsFormat.Normalize(selectedOptions);
+            if (!ProductOptionStore.SelectionsStillValid(groups, selections))
+            {
+                return StripeCheckoutResult.Fail(
+                    groups.Count > 0
+                        ? "Choose your options on the product page before buying."
+                        : "That product’s options could not be verified. Try again from the product page.");
+            }
+
             var tiktokId = string.IsNullOrWhiteSpace(product.TikTokId) ? "none" : product.TikTokId!;
 
             return await CreateSessionAsync(
                 secretKey,
-                new List<SessionLineItemOptions> { BuildLineItem(product, quantity: 1) },
+                new List<SessionLineItemOptions> { BuildLineItem(product, quantity: 1, selections) },
                 successPath: "/Checkout/Success",
                 cancelPath: "/Catalog",
                 metadata: new Dictionary<string, string>
@@ -226,15 +269,37 @@ public class StripeCheckoutService(
         return ex;
     }
 
-    private static SessionLineItemOptions BuildLineItem(Models.Product product, int quantity)
+    private static SessionLineItemOptions BuildLineItem(
+        Models.Product product,
+        int quantity,
+        IReadOnlyList<CartOptionSelection>? selectedOptions)
     {
         var unitCents = (long)Math.Round(product.Price * 100m, MidpointRounding.AwayFromZero);
         if (unitCents < 50)
             unitCents = 50;
 
-        var name = string.IsNullOrWhiteSpace(product.Name) ? $"Item {product.Id}" : product.Name.Trim();
+        var baseName = string.IsNullOrWhiteSpace(product.Name) ? $"Item {product.Id}" : product.Name.Trim();
+        var optionsSummary = ProductOptionsFormat.Summary(selectedOptions);
+        var name = string.IsNullOrWhiteSpace(optionsSummary)
+            ? baseName
+            : $"{baseName} — {optionsSummary}";
         if (name.Length > 250)
             name = name[..247] + "…";
+
+        var description = StripeDescription(product.Description, optionsSummary);
+
+        var metadata = new Dictionary<string, string>
+        {
+            ["product_id"] = product.Id.ToString(),
+        };
+        foreach (var opt in ProductOptionsFormat.Normalize(selectedOptions))
+        {
+            var key = SanitizeMetadataKey("option_" + opt.GroupName);
+            if (metadata.Count >= 45)
+                break;
+            if (!metadata.ContainsKey(key))
+                metadata[key] = TruncateMetadata(opt.ChoiceLabel);
+        }
 
         return new SessionLineItemOptions
         {
@@ -246,19 +311,37 @@ public class StripeCheckoutService(
                 ProductData = new SessionLineItemPriceDataProductDataOptions
                 {
                     Name = name,
-                    Description = StripeDescription(product.Description),
+                    Description = description,
+                    Metadata = metadata,
                 },
             },
         };
     }
 
-    private static string? StripeDescription(string? htmlDescription)
+    private static string SanitizeMetadataKey(string key)
     {
-        var plain = HtmlPlainText.FromHtml(htmlDescription);
-        if (string.IsNullOrWhiteSpace(plain))
+        var chars = key.Trim()
+            .Select(c => char.IsLetterOrDigit(c) || c is '_' or '-' ? c : '_')
+            .Take(40)
+            .ToArray();
+        var s = new string(chars);
+        return string.IsNullOrEmpty(s) ? "option" : s;
+    }
+
+    private static string? StripeDescription(string? htmlDescription, string optionsSummary)
+    {
+        var plain = HtmlPlainText.FromHtml(htmlDescription)?.Replace('\n', ' ').Trim();
+        string? text;
+        if (!string.IsNullOrWhiteSpace(optionsSummary) && !string.IsNullOrWhiteSpace(plain))
+            text = $"{optionsSummary}. {plain}";
+        else if (!string.IsNullOrWhiteSpace(optionsSummary))
+            text = optionsSummary;
+        else
+            text = plain;
+
+        if (string.IsNullOrWhiteSpace(text))
             return null;
-        plain = plain.Replace('\n', ' ');
-        return plain.Length <= 500 ? plain : plain[..497] + "…";
+        return text.Length <= 500 ? text : text[..497] + "…";
     }
 
     private static string TruncateMetadata(string value)

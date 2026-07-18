@@ -21,6 +21,9 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
     public List<IFormFile>? GalleryFiles { get; set; }
 
     [BindProperty]
+    public List<ProductOptionStore.GroupInput>? OptionGroups { get; set; }
+
+    [BindProperty]
     public bool RemoveUploadedImage { get; set; }
 
     public string? CurrentImageSrc { get; private set; }
@@ -50,7 +53,6 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         Input = new CreateModel.ProductInput
         {
             Name = product.Name,
-            // Keep HTML for Quill; sanitize so the editor only sees safe markup.
             Description = DescriptionHtml.Sanitize(product.Description),
             Price = product.Price,
             ImageUrl = product.ImageUrl,
@@ -68,12 +70,15 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             : product.ImageUrl;
         ViewData["CurrentImageSrc"] = CurrentImageSrc;
         await LoadGalleryThumbsAsync(cancellationToken);
+        await LoadOptionGroupsAsync(cancellationToken);
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         ViewData["LibraryDatabase"] = dbInfo.Description;
+        ViewData["OptionGroups"] = OptionGroups ?? [];
+
         if (ImageFile is null or { Length: 0 }
             && !string.IsNullOrWhiteSpace(Input.ImageUrl)
             && (!Uri.TryCreate(Input.ImageUrl.Trim(), UriKind.Absolute, out var uri)
@@ -90,7 +95,11 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             ModelState.AddModelError("Input.TikTokVideoUrl", "Enter a full TikTok video URL, or leave blank.");
         }
 
-        if (!ModelState.IsValid)
+        var parsedOptions = ProductOptionStore.ParsePosted(
+            OptionGroups,
+            (_, message) => ModelState.AddModelError("OptionGroups", message));
+
+        if (!ModelState.IsValid || parsedOptions is null)
         {
             CurrentImageSrc = ViewData["CurrentImageSrc"] as string;
             await LoadGalleryThumbsAsync(cancellationToken);
@@ -145,7 +154,6 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             product.ImageUrl = NullIfEmpty(Input.ImageUrl);
         }
 
-        // Avoid EF binding ImageData byte[] (breaks on Turso); persist blobs separately.
         await db.SaveChangesAsync(cancellationToken);
 
         if (clearImage)
@@ -163,6 +171,8 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             TempData["FlashMessage"] = $"Updated “{product.Name}”, but a gallery image was skipped: {ex.Message}";
             return RedirectToPage("./Index");
         }
+
+        await ProductOptionStore.ReplaceAsync(db, product.Id, parsedOptions, cancellationToken);
 
         TempData["FlashMessage"] = $"Updated “{product.Name}”.";
         return RedirectToPage("./Index");
@@ -191,6 +201,19 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             .Select(gid => (Id: gid, Src: ProductImageSrc.GallerySrc(Id, gid)))
             .ToList();
         ViewData["GalleryThumbs"] = (IReadOnlyList<(int Id, string Src)>)thumbs;
+    }
+
+    private async Task LoadOptionGroupsAsync(CancellationToken cancellationToken)
+    {
+        var groups = await ProductOptionStore.LoadForProductAsync(db, Id, cancellationToken);
+        OptionGroups = groups
+            .Select(g => new ProductOptionStore.GroupInput
+            {
+                Name = g.Name,
+                Choices = g.Choices.Select(c => c.Label).ToList(),
+            })
+            .ToList();
+        ViewData["OptionGroups"] = OptionGroups;
     }
 
     private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

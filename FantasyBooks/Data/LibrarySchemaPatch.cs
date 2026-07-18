@@ -56,6 +56,36 @@ public static class LibrarySchemaPatch
         await TryExecAsync(
             db,
             """
+            CREATE TABLE IF NOT EXISTS "ProductOptionGroups" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ProductOptionGroups" PRIMARY KEY AUTOINCREMENT,
+                "ProductId" INTEGER NOT NULL,
+                "Name" TEXT NOT NULL,
+                "SortOrder" INTEGER NOT NULL DEFAULT 0,
+                CONSTRAINT "FK_ProductOptionGroups_Products_ProductId"
+                    FOREIGN KEY ("ProductId") REFERENCES "Products" ("Id") ON DELETE CASCADE
+            );
+            """,
+            logger,
+            cancellationToken);
+
+        await TryExecAsync(
+            db,
+            """
+            CREATE TABLE IF NOT EXISTS "ProductOptionChoices" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ProductOptionChoices" PRIMARY KEY AUTOINCREMENT,
+                "GroupId" INTEGER NOT NULL,
+                "Label" TEXT NOT NULL,
+                "SortOrder" INTEGER NOT NULL DEFAULT 0,
+                CONSTRAINT "FK_ProductOptionChoices_ProductOptionGroups_GroupId"
+                    FOREIGN KEY ("GroupId") REFERENCES "ProductOptionGroups" ("Id") ON DELETE CASCADE
+            );
+            """,
+            logger,
+            cancellationToken);
+
+        await TryExecAsync(
+            db,
+            """
             CREATE TABLE IF NOT EXISTS "TikTokVideos" (
                 "Id" INTEGER NOT NULL CONSTRAINT "PK_TikTokVideos" PRIMARY KEY AUTOINCREMENT,
                 "VideoUrl" TEXT NOT NULL,

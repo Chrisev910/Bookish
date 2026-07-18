@@ -91,12 +91,41 @@
             }
 
             <div class="border-t border-ink/10 pt-6">
-                <form method="post" asp-page="/Product" asp-route-id="@p.Id" asp-page-handler="AddToCart" class="flex flex-wrap items-center gap-4">
+                @if (!string.IsNullOrWhiteSpace(Model.OptionsError))
+                {
+                    <p class="mb-4 rounded-xl border border-gold-500/35 bg-white/50 px-4 py-3 text-sm text-ink" role="alert">@Model.OptionsError</p>
+                }
+                @if (TempData["FlashMessage"] is string flash && !string.IsNullOrWhiteSpace(flash))
+                {
+                    <p class="mb-4 text-sm font-medium text-gold-600">@flash</p>
+                }
+                <form method="post" asp-page="/Product" asp-route-id="@p.Id" asp-page-handler="AddToCart" class="space-y-4">
                     <input type="hidden" name="productId" value="@p.Id" />
-                    <button type="submit" class="magical-glow-btn rounded-xl bg-gold-500 px-8 py-3.5 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
-                        Add to Satchel
-                    </button>
-                    <a asp-page="/Cart" class="text-sm font-semibold text-ink/70 hover:text-gold-600">View satchel</a>
+                    @if (Model.OptionGroups.Count > 0)
+                    {
+                        <div class="space-y-3" aria-label="Product options">
+                            @foreach (var group in Model.OptionGroups)
+                            {
+                                <div>
+                                    <label for="option_@group.Id" class="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gold-600">@group.Name</label>
+                                    <select id="option_@group.Id" name="option_@group.Id" required
+                                            class="w-full max-w-sm rounded-xl border border-ink/15 bg-white/60 px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-gold-500/30">
+                                        <option value="">Choose @group.Name.ToLowerInvariant()…</option>
+                                        @foreach (var choice in group.Choices)
+                                        {
+                                            <option value="@choice.Id">@choice.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                        </div>
+                    }
+                    <div class="flex flex-wrap items-center gap-4">
+                        <button type="submit" class="magical-glow-btn rounded-xl bg-gold-500 px-8 py-3.5 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
+                            Add to Satchel
+                        </button>
+                        <a asp-page="/Cart" class="text-sm font-semibold text-ink/70 hover:text-gold-600">View satchel</a>
+                    </div>
                 </form>
             </div>
         </div>

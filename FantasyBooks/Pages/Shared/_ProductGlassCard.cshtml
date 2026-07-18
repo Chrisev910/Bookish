@@ -29,25 +29,36 @@
                 <p class="line-clamp-4 text-sm leading-relaxed text-ink/65">@descPreview</p>
             }
             <div class="mt-auto flex flex-col gap-2 border-t border-ink/10 pt-4">
-                <form method="post" asp-page="/Catalog" asp-page-handler="AddToCart" class="inline w-full">
-                    <input type="hidden" name="productId" value="@Model.Id" />
-                    @if (ViewData["CatalogSearch"] is string catalogSearch && !string.IsNullOrWhiteSpace(catalogSearch))
-                    {
-                        <input type="hidden" name="search" value="@catalogSearch" />
-                    }
-                    <button type="submit" class="magical-glow-btn w-full rounded-xl bg-gold-500 px-4 py-3 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
-                        Add to Satchel
-                    </button>
-                </form>
-                @if (ViewData["IncludeStripeBuyNow"] is bool showBuyNow && showBuyNow)
+                @if (Model.HasOptions)
                 {
-                    <form method="post" asp-page="/Catalog" asp-page-handler="BuyNow" class="w-full" data-checkout-loading>
+                    <a asp-page="/Product" asp-route-id="@Model.Id"
+                       class="magical-glow-btn block w-full rounded-xl bg-gold-500 px-4 py-3 text-center text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
+                        Choose options
+                    </a>
+                    <p class="text-center text-xs text-ink/45">Options available — pick on the product page</p>
+                }
+                else
+                {
+                    <form method="post" asp-page="/Catalog" asp-page-handler="AddToCart" class="inline w-full">
                         <input type="hidden" name="productId" value="@Model.Id" />
-                        <button type="submit"
-                                class="w-full rounded-xl border border-gold-500/50 bg-white/40 px-4 py-3 text-sm font-semibold text-ink shadow-sm backdrop-blur-sm transition hover:border-gold-500 hover:bg-white/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
-                            Buy now
+                        @if (ViewData["CatalogSearch"] is string catalogSearch && !string.IsNullOrWhiteSpace(catalogSearch))
+                        {
+                            <input type="hidden" name="search" value="@catalogSearch" />
+                        }
+                        <button type="submit" class="magical-glow-btn w-full rounded-xl bg-gold-500 px-4 py-3 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
+                            Add to Satchel
                         </button>
                     </form>
+                    @if (ViewData["IncludeStripeBuyNow"] is bool showBuyNow && showBuyNow)
+                    {
+                        <form method="post" asp-page="/Catalog" asp-page-handler="BuyNow" class="w-full" data-checkout-loading>
+                            <input type="hidden" name="productId" value="@Model.Id" />
+                            <button type="submit"
+                                    class="w-full rounded-xl border border-gold-500/50 bg-white/40 px-4 py-3 text-sm font-semibold text-ink shadow-sm backdrop-blur-sm transition hover:border-gold-500 hover:bg-white/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper">
+                                Buy now
+                            </button>
+                        </form>
+                    }
                 }
             </div>
         </div>
