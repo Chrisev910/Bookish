@@ -98,6 +98,21 @@
         </form>
     </section>
 
+    <section class="rounded-2xl border border-ink/10 bg-white/35 p-6 shadow-float backdrop-blur-[10px] sm:p-8">
+        <div class="mb-6 border-b border-ink/10 pb-4">
+            <h2 class="font-display text-xl font-semibold text-ink sm:text-2xl">Cache remote images</h2>
+            <p class="mt-2 max-w-prose text-sm leading-relaxed text-ink/60">
+                Downloads TikTok (or other) image URLs into the database so the shop no longer depends on external hosting.
+                Safe to re-run — products that already have an uploaded image are skipped.
+            </p>
+        </div>
+        <form method="post" asp-page="/Admin/Import" asp-page-handler="CacheRemoteImages">
+            <button type="submit" class="rounded-xl border border-ink/15 bg-white/55 px-6 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-gold-500/40 hover:bg-white/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/40">
+                Cache remote images
+            </button>
+        </form>
+    </section>
+
     <section class="rounded-2xl border border-red-300/50 bg-red-50/20 p-6 shadow-float backdrop-blur-[10px] ring-1 ring-red-200/45 sm:p-8">
         <h2 class="font-display text-lg font-semibold text-red-950 sm:text-xl">Clear all inventory</h2>
         <p class="mt-2 text-sm leading-relaxed text-red-950/85">

@@ -83,6 +83,12 @@ builder.Services.AddSession(options =>
     options.Cookie.SecurePolicy = cookieSecurePolicy;
 });
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient(ProductRemoteImageFetcher.HttpClientName, client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("BookishInkPaper/1.0 (+https://github.com/Chrisev910/Bookish)");
+});
+builder.Services.AddScoped<ProductRemoteImageFetcher>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<StripeCheckoutService>();
 builder.Services.AddScoped<TikTokIntegrationService>();

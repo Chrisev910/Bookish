@@ -14,12 +14,18 @@ public class ImportModel : PageModel
     private readonly TikTokIntegrationService _tikTok;
     private readonly LibraryContext _db;
     private readonly LibraryDatabaseInfo _dbInfo;
+    private readonly ProductRemoteImageFetcher _imageFetcher;
 
-    public ImportModel(TikTokIntegrationService tikTok, LibraryContext db, LibraryDatabaseInfo dbInfo)
+    public ImportModel(
+        TikTokIntegrationService tikTok,
+        LibraryContext db,
+        LibraryDatabaseInfo dbInfo,
+        ProductRemoteImageFetcher imageFetcher)
     {
         _tikTok = tikTok;
         _db = db;
         _dbInfo = dbInfo;
+        _imageFetcher = imageFetcher;
     }
 
     [BindProperty]
@@ -101,22 +107,23 @@ public class ImportModel : PageModel
 
             if (existing is null)
             {
-                _db.Products.Add(new Product
+                var product = new Product
                 {
                     TikTokId = tikTokId,
                     Name = name.Trim(),
                     Price = price,
-                    ImageUrl = imageUrl,
                     Description = description,
-                });
+                };
+                await _imageFetcher.ApplyAsync(product, imageUrl, cancellationToken);
+                _db.Products.Add(product);
             }
             else
             {
                 existing.Name = name.Trim();
                 existing.Price = price;
-                existing.ImageUrl = imageUrl;
                 existing.Description = description;
                 existing.TikTokId = tikTokId;
+                await _imageFetcher.ApplyAsync(existing, imageUrl, cancellationToken);
             }
 
             upserted++;
@@ -129,6 +136,41 @@ public class ImportModel : PageModel
             : $"Import complete: {upserted} product row(s) saved. ";
 
         return RedirectToPage("/Catalog");
+    }
+
+    public async Task<IActionResult> OnPostCacheRemoteImagesAsync(CancellationToken cancellationToken)
+    {
+        var candidates = await _db.Products
+            .Where(p => p.ImageUrl != null && p.ImageUrl != "")
+            .ToListAsync(cancellationToken);
+
+        var cached = 0;
+        var failed = 0;
+        var skipped = 0;
+
+        foreach (var product in candidates)
+        {
+            if (product.HasUploadedImage)
+            {
+                skipped++;
+                continue;
+            }
+
+            var url = product.ImageUrl;
+            await _imageFetcher.ApplyAsync(product, url, cancellationToken);
+
+            if (product.HasUploadedImage)
+                cached++;
+            else
+                failed++;
+        }
+
+        if (cached > 0 || failed > 0)
+            await _db.SaveChangesAsync(cancellationToken);
+
+        TempData["FlashMessage"] =
+            $"Remote image cache: cached {cached}, failed {failed}, skipped {skipped}.";
+        return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostClearAllInventoryAsync(CancellationToken cancellationToken)
