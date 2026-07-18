@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FantasyBooks.Services;
 
-public class TikTokIntegrationService(LibraryContext db, ProductRemoteImageFetcher imageFetcher)
+public class TikTokIntegrationService(LibraryContext db)
 {
     private static readonly string[] NameKeys = ["Product Name", "product_name", "ProductName", "Title", "title", "Product Title"];
     private static readonly string[] ImageKeys = ["Main Image", "main_image", "MainImage", "Image", "image", "Main image URL", "Product Image"];
@@ -375,10 +375,11 @@ public class TikTokIntegrationService(LibraryContext db, ProductRemoteImageFetch
                 {
                     TikTokId = row.TikTokId,
                     Name = row.Name,
+                    ImageUrl = row.ImageUrl,
                     Description = row.Description,
                     Price = row.Price ?? 0,
                 };
-                await imageFetcher.ApplyAsync(p, row.ImageUrl, cancellationToken);
+                // Image bytes are filled by Admin → Cache remote images (batched) to avoid timeouts.
                 db.Products.Add(p);
                 created++;
             }
@@ -393,7 +394,9 @@ public class TikTokIntegrationService(LibraryContext db, ProductRemoteImageFetch
                 if (!string.IsNullOrWhiteSpace(row.TikTokId))
                     existing.TikTokId = row.TikTokId;
 
-                await imageFetcher.ApplyAsync(existing, row.ImageUrl, cancellationToken);
+                if (!existing.HasUploadedImage)
+                    existing.ImageUrl = row.ImageUrl;
+
                 updated++;
             }
         }

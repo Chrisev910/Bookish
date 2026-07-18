@@ -37,6 +37,9 @@ public class ErrorModel : PageModel
             || (ex?.GetType().Name.Contains("Antiforgery", StringComparison.OrdinalIgnoreCase) ?? false))
         {
             var path = feature?.Path ?? string.Empty;
+            if (path.Contains("/Admin", StringComparison.OrdinalIgnoreCase))
+                return RedirectToPage("/Admin/Login");
+
             if (path.Contains("BuyNow", StringComparison.OrdinalIgnoreCase)
                 || path.Contains("/Catalog", StringComparison.OrdinalIgnoreCase))
             {
@@ -47,7 +50,15 @@ public class ErrorModel : PageModel
         }
 
         if (ex is not null)
-            ErrorDetail = $"{ex.GetType().Name}: {ex.Message}";
+        {
+            var root = ex;
+            while (root.InnerException is not null)
+                root = root.InnerException;
+            ErrorDetail = $"{ex.GetType().Name}: {ex.Message}"
+                + (root != ex ? $" | {root.GetType().Name}: {root.Message}" : "");
+            if (!string.IsNullOrEmpty(feature?.Path))
+                ErrorDetail += $" (at {feature.Path})";
+        }
 
         return Page();
     }

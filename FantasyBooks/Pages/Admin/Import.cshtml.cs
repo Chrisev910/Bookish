@@ -11,21 +11,27 @@ namespace FantasyBooks.Pages.Admin;
 
 public class ImportModel : PageModel
 {
+    /// <summary>Keep each request under Render's proxy timeout.</summary>
+    private const int CacheRemoteImagesBatchSize = 5;
+
     private readonly TikTokIntegrationService _tikTok;
     private readonly LibraryContext _db;
     private readonly LibraryDatabaseInfo _dbInfo;
     private readonly ProductRemoteImageFetcher _imageFetcher;
+    private readonly ILogger<ImportModel> _logger;
 
     public ImportModel(
         TikTokIntegrationService tikTok,
         LibraryContext db,
         LibraryDatabaseInfo dbInfo,
-        ProductRemoteImageFetcher imageFetcher)
+        ProductRemoteImageFetcher imageFetcher,
+        ILogger<ImportModel> logger)
     {
         _tikTok = tikTok;
         _db = db;
         _dbInfo = dbInfo;
         _imageFetcher = imageFetcher;
+        _logger = logger;
     }
 
     [BindProperty]
@@ -113,9 +119,11 @@ public class ImportModel : PageModel
                     Name = name.Trim(),
                     Price = price,
                     Description = description,
+                    ImageUrl = imageUrl,
                 };
-                await _imageFetcher.ApplyAsync(product, imageUrl, cancellationToken);
                 _db.Products.Add(product);
+                // Persist row first; images are cached in small batches via Cache remote images
+                // (avoids Render timeouts / huge Turso writes on large imports).
             }
             else
             {
@@ -123,7 +131,8 @@ public class ImportModel : PageModel
                 existing.Price = price;
                 existing.Description = description;
                 existing.TikTokId = tikTokId;
-                await _imageFetcher.ApplyAsync(existing, imageUrl, cancellationToken);
+                if (!existing.HasUploadedImage)
+                    existing.ImageUrl = imageUrl;
             }
 
             upserted++;
@@ -133,44 +142,93 @@ public class ImportModel : PageModel
 
         TempData["FlashMessage"] = upserted == 0
             ? "No product rows were imported. Open the TikTok Template sheet, add rows below the header block (row 6+), and ensure Product ID / product_id and Product name are filled."
-            : $"Import complete: {upserted} product row(s) saved. ";
+            : $"Import complete: {upserted} product row(s) saved. Use Admin → Import → Cache remote images to store cover images in the database.";
 
         return RedirectToPage("/Catalog");
     }
 
     public async Task<IActionResult> OnPostCacheRemoteImagesAsync(CancellationToken cancellationToken)
     {
-        var candidates = await _db.Products
-            .Where(p => p.ImageUrl != null && p.ImageUrl != "")
-            .ToListAsync(cancellationToken);
-
-        var cached = 0;
-        var failed = 0;
-        var skipped = 0;
-
-        foreach (var product in candidates)
+        try
         {
-            if (product.HasUploadedImage)
+            // Only URL-only rows (no stored blob yet). Load ids first so we never pull every BLOB.
+            var pendingIds = await _db.Products
+                .AsNoTracking()
+                .Where(p =>
+                    p.ImageUrl != null
+                    && p.ImageUrl != ""
+                    && (p.ImageContentType == null || p.ImageContentType == ""))
+                .OrderBy(p => p.Id)
+                .Select(p => p.Id)
+                .ToListAsync(cancellationToken);
+
+            var remainingBefore = pendingIds.Count;
+            if (remainingBefore == 0)
             {
-                skipped++;
-                continue;
+                TempData["FlashMessage"] = "Remote image cache: nothing to do — every listing with a URL already has a stored image.";
+                return RedirectToPage();
             }
 
-            var url = product.ImageUrl;
-            await _imageFetcher.ApplyAsync(product, url, cancellationToken);
+            var batchIds = pendingIds.Take(CacheRemoteImagesBatchSize).ToList();
+            var cached = 0;
+            var failed = 0;
 
-            if (product.HasUploadedImage)
-                cached++;
-            else
-                failed++;
+            foreach (var id in batchIds)
+            {
+                var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+                if (product is null)
+                    continue;
+
+                if (product.HasUploadedImage || string.IsNullOrWhiteSpace(product.ImageUrl))
+                    continue;
+
+                var url = product.ImageUrl;
+                try
+                {
+                    await _imageFetcher.ApplyAsync(product, url, cancellationToken);
+                    await _db.SaveChangesAsync(cancellationToken);
+
+                    if (product.HasUploadedImage)
+                        cached++;
+                    else
+                        failed++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _logger.LogError(ex, "Failed caching remote image for product {ProductId}", id);
+                    DetachAllTracked();
+                }
+            }
+
+            var remainingAfter = Math.Max(0, remainingBefore - batchIds.Count);
+            // Recount accurately for the flash (some may have failed and still need work).
+            remainingAfter = await _db.Products
+                .AsNoTracking()
+                .CountAsync(
+                    p =>
+                        p.ImageUrl != null
+                        && p.ImageUrl != ""
+                        && (p.ImageContentType == null || p.ImageContentType == ""),
+                    cancellationToken);
+
+            TempData["FlashMessage"] = remainingAfter > 0
+                ? $"Remote image cache: cached {cached}, failed {failed} this run. {remainingAfter} still need caching — click Cache remote images again."
+                : $"Remote image cache: cached {cached}, failed {failed}. All done.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cache remote images failed");
+            TempData["FlashMessage"] = $"Remote image cache failed: {ex.Message}";
         }
 
-        if (cached > 0 || failed > 0)
-            await _db.SaveChangesAsync(cancellationToken);
-
-        TempData["FlashMessage"] =
-            $"Remote image cache: cached {cached}, failed {failed}, skipped {skipped}.";
         return RedirectToPage();
+    }
+
+    private void DetachAllTracked()
+    {
+        foreach (var entry in _db.ChangeTracker.Entries().ToList())
+            entry.State = EntityState.Detached;
     }
 
     public async Task<IActionResult> OnPostClearAllInventoryAsync(CancellationToken cancellationToken)

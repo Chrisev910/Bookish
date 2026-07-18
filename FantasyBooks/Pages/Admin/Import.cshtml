@@ -103,7 +103,7 @@
             <h2 class="font-display text-xl font-semibold text-ink sm:text-2xl">Cache remote images</h2>
             <p class="mt-2 max-w-prose text-sm leading-relaxed text-ink/60">
                 Downloads TikTok (or other) image URLs into the database so the shop no longer depends on external hosting.
-                Safe to re-run — products that already have an uploaded image are skipped.
+                Processes a few products per click (to avoid timeouts) — re-run until the message says all done.
             </p>
         </div>
         <form method="post" asp-page="/Admin/Import" asp-page-handler="CacheRemoteImages">
