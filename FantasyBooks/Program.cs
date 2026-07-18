@@ -18,14 +18,20 @@ if (builder.Environment.IsDevelopment())
 }
 
 ApplyStripeFromEnvironment(builder.Configuration);
+ApplyPublicBaseUrlFromEnvironment(builder.Configuration);
 
 var resolvedStripeSecretKey = StripeSecretResolver.ResolveSecretKey(builder.Configuration);
 StripeConfiguration.ApiKey = resolvedStripeSecretKey;
+
+var runningBehindProxy =
+    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("RENDER"))
+    || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PORT"));
+
 var portEnv = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(portEnv))
     builder.WebHost.UseUrls($"http://0.0.0.0:{portEnv}");
 
-var dataProtectionKeysDir = Path.Combine(builder.Environment.ContentRootPath, "dp-keys");
+var dataProtectionKeysDir = ResolveDataProtectionKeysDirectory(builder.Environment.ContentRootPath);
 try
 {
     Directory.CreateDirectory(dataProtectionKeysDir);
@@ -63,16 +69,20 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromHours(2);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
-    if (!builder.Environment.IsDevelopment())
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<TikTokIntegrationService>();
 builder.Services.AddAntiforgery(options =>
 {
-    if (!builder.Environment.IsDevelopment())
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
 });
 
 builder.Services.AddRazorPages();
@@ -86,15 +96,16 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.SupportedUICultures = [enGb];
 });
 
-if (!builder.Environment.IsDevelopment())
+// Render (and similar hosts) terminate TLS and forward HTTP to the container.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    builder.Services.Configure<ForwardedHeadersOptions>(options =>
-    {
-        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-        options.KnownNetworks.Clear();
-        options.KnownProxies.Clear();
-    });
-}
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+    options.RequireHeaderSymmetry = false;
+});
 
 var app = builder.Build();
 
@@ -115,20 +126,28 @@ using (var scope = app.Services.CreateScope())
     SeedData.Initialize(context);
 }
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+// Forwarded headers must run before anything that reads Scheme/Host (cookies, HTTPS redirection, Stripe URLs).
+app.UseForwardedHeaders();
+
+if (runningBehindProxy)
 {
-    app.UseForwardedHeaders();
+    app.Use(async (context, next) =>
+    {
+        ApplyForwardedRequestFields(context.Request);
+        await next();
+    });
 }
 
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// Behind Render, TLS is already terminated at the proxy. Redirecting HTTP→HTTPS here
+// rewrites checkout POSTs and commonly breaks antiforgery validation.
+if (!runningBehindProxy)
+    app.UseHttpsRedirection();
 
 app.UseRouting();
 
@@ -159,5 +178,51 @@ static void ApplyStripeFromEnvironment(ConfigurationManager config)
         var pk = StripeSecretResolver.ReadPublishableKeyFromEnv();
         if (!string.IsNullOrWhiteSpace(pk))
             config.AddInMemoryCollection(new Dictionary<string, string?> { ["Stripe:PublishableKey"] = pk });
+    }
+}
+
+static void ApplyPublicBaseUrlFromEnvironment(ConfigurationManager config)
+{
+    if (!string.IsNullOrWhiteSpace(config["App:PublicBaseUrl"]))
+        return;
+
+    var renderUrl = Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL")?.Trim();
+    if (!string.IsNullOrWhiteSpace(renderUrl))
+    {
+        config.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:PublicBaseUrl"] = renderUrl.TrimEnd('/'),
+        });
+    }
+}
+
+static string ResolveDataProtectionKeysDirectory(string contentRootPath)
+{
+    var configured = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEYS_PATH")?.Trim();
+    if (!string.IsNullOrWhiteSpace(configured))
+        return configured;
+
+    // Optional persistent disk mount used on Render.
+    const string renderDataKeys = "/data/dp-keys";
+    if (Directory.Exists("/data") || Directory.Exists(renderDataKeys))
+        return renderDataKeys;
+
+    return Path.Combine(contentRootPath, "dp-keys");
+}
+
+static void ApplyForwardedRequestFields(HttpRequest request)
+{
+    if (request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProto))
+    {
+        var proto = forwardedProto.ToString().Split(',', 2)[0].Trim();
+        if (!string.IsNullOrEmpty(proto))
+            request.Scheme = proto;
+    }
+
+    if (request.Headers.TryGetValue("X-Forwarded-Host", out var forwardedHost))
+    {
+        var host = forwardedHost.ToString().Split(',', 2)[0].Trim();
+        if (!string.IsNullOrEmpty(host))
+            request.Host = HostString.FromUriComponent(host);
     }
 }

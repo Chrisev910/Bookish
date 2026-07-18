@@ -3,8 +3,11 @@
 #   Stripe__SecretKey   or   STRIPE_SECRET_KEY
 #   Stripe__PublishableKey   or   STRIPE_PUBLISHABLE_KEY
 # Optional Docker-style file path: STRIPE_SECRET_KEY_FILE=/run/secrets/stripe_secret
+# RENDER_EXTERNAL_URL is set by Render and used for Stripe success/cancel links.
+# Optional override: App__PublicBaseUrl=https://your-service.onrender.com
 # SQLite lives on the instance filesystem; data is lost on redeploy unless you add a persistent disk
 # and set ConnectionStrings__Library to e.g. Data Source=/data/library.db
+# Optional persistent disk also keeps antiforgery keys: DATA_PROTECTION_KEYS_PATH=/data/dp-keys
 services:
   - type: web
     name: fantasybooks
