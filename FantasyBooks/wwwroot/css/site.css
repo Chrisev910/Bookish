@@ -307,12 +307,6 @@ body.noise-root {
   object-position: center;
 }
 
-@media (min-width: 640px) {
-  .product-gallery__img {
-    object-fit: cover;
-  }
-}
-
 .product-gallery__nav {
   position: absolute;
   top: 50%;
