@@ -14,6 +14,8 @@ public class ErrorModel : PageModel
 
     public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
 
+    public string? ErrorDetail { get; set; }
+
     private readonly ILogger<ErrorModel> _logger;
 
     public ErrorModel(ILogger<ErrorModel> logger)
@@ -25,25 +27,45 @@ public class ErrorModel : PageModel
     {
         RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
         var feature = HttpContext.Features.Get<IExceptionHandlerPathFeature>();
-        if (feature?.Error is { } ex)
-            _logger.LogError(ex, "Unhandled exception for {Path}", feature.Path);
+        var ex = Unwrap(feature?.Error);
 
-        // Checkout POSTs fail with a generic error page when antiforgery cookies break behind a proxy
-        // or after a recycle. Send shoppers back with a retry message instead.
-        if (feature?.Error is AntiforgeryValidationException)
+        if (ex is not null)
+            _logger.LogError(ex, "Unhandled exception for {Path}", feature?.Path);
+
+        // Avoid TempData here — session is often unavailable on the exception-handler re-execute.
+        if (ex is AntiforgeryValidationException
+            || (ex?.GetType().Name.Contains("Antiforgery", StringComparison.OrdinalIgnoreCase) ?? false))
         {
-            var path = feature.Path ?? string.Empty;
+            var path = feature?.Path ?? string.Empty;
             if (path.Contains("BuyNow", StringComparison.OrdinalIgnoreCase)
-                || path.Contains("/Checkout/", StringComparison.OrdinalIgnoreCase))
+                || path.Contains("/Catalog", StringComparison.OrdinalIgnoreCase))
             {
-                TempData["FlashMessage"] = "Your checkout form expired. Please try again.";
-                return RedirectToPage("/Catalog");
+                return RedirectToPage("/Catalog", new { error = "Your checkout form expired. Please try again." });
             }
 
-            TempData["CartError"] = "Your checkout form expired. Please try again.";
-            return RedirectToPage("/Cart");
+            return RedirectToPage("/Cart", new { error = "Your checkout form expired. Please try again." });
         }
 
+        if (ex is not null)
+            ErrorDetail = $"{ex.GetType().Name}: {ex.Message}";
+
         return Page();
+    }
+
+    private static Exception? Unwrap(Exception? ex)
+    {
+        while (ex is AggregateException { InnerExceptions.Count: 1 } agg)
+            ex = agg.InnerExceptions[0];
+        while (ex?.InnerException is not null
+               && ex is not AntiforgeryValidationException
+               && ex.GetType().Name.Contains("Antiforgery", StringComparison.OrdinalIgnoreCase) == false)
+        {
+            // Prefer the innermost useful message for display, but keep antiforgery at the top if present.
+            if (ex.InnerException is AntiforgeryValidationException innerAf)
+                return innerAf;
+            break;
+        }
+
+        return ex;
     }
 }

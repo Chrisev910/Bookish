@@ -62,6 +62,12 @@ builder.Services.PostConfigure<StripeOptions>(opts =>
     if (string.IsNullOrWhiteSpace(opts.PublishableKey))
         opts.PublishableKey = StripeSecretResolver.ResolvePublishableKey(builder.Configuration);
 });
+// Behind Render, Request.IsHttps can still be wrong when cookies are written. SameAsRequest
+// avoids dropping Secure session/antiforgery cookies on the internal HTTP hop.
+var cookieSecurePolicy = builder.Environment.IsDevelopment() || runningBehindProxy
+    ? CookieSecurePolicy.SameAsRequest
+    : CookieSecurePolicy.Always;
+
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -70,19 +76,16 @@ builder.Services.AddSession(options =>
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CartService>();
+builder.Services.AddScoped<StripeCheckoutService>();
 builder.Services.AddScoped<TikTokIntegrationService>();
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
 });
 
 builder.Services.AddRazorPages();
@@ -212,17 +215,24 @@ static string ResolveDataProtectionKeysDirectory(string contentRootPath)
 
 static void ApplyForwardedRequestFields(HttpRequest request)
 {
-    if (request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProto))
+    try
     {
-        var proto = forwardedProto.ToString().Split(',', 2)[0].Trim();
-        if (!string.IsNullOrEmpty(proto))
-            request.Scheme = proto;
-    }
+        if (request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProto))
+        {
+            var proto = forwardedProto.ToString().Split(',', 2)[0].Trim();
+            if (!string.IsNullOrEmpty(proto))
+                request.Scheme = proto;
+        }
 
-    if (request.Headers.TryGetValue("X-Forwarded-Host", out var forwardedHost))
+        if (request.Headers.TryGetValue("X-Forwarded-Host", out var forwardedHost))
+        {
+            var host = forwardedHost.ToString().Split(',', 2)[0].Trim();
+            if (!string.IsNullOrEmpty(host))
+                request.Host = HostString.FromUriComponent(host);
+        }
+    }
+    catch
     {
-        var host = forwardedHost.ToString().Split(',', 2)[0].Trim();
-        if (!string.IsNullOrEmpty(host))
-            request.Host = HostString.FromUriComponent(host);
+        // Ignore malformed forwarded headers; PublicBaseUrl / RENDER_EXTERNAL_URL still apply.
     }
 }

@@ -11,11 +11,19 @@ public class CartModel : PageModel
 {
     private readonly CartService _cart;
     private readonly LibraryContext _db;
+    private readonly StripeCheckoutService _checkout;
+    private readonly ILogger<CartModel> _logger;
 
-    public CartModel(CartService cart, LibraryContext db)
+    public CartModel(
+        CartService cart,
+        LibraryContext db,
+        StripeCheckoutService checkout,
+        ILogger<CartModel> logger)
     {
         _cart = cart;
         _db = db;
+        _checkout = checkout;
+        _logger = logger;
     }
 
     public string? CartError { get; private set; }
@@ -27,9 +35,12 @@ public class CartModel : PageModel
     /// <summary>True when the session lists product IDs that no longer exist in the library (e.g. after re-import).</summary>
     public bool HasInvalidLines { get; private set; }
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(string? error)
     {
         CartError = TempData["CartError"]?.ToString();
+        if (string.IsNullOrEmpty(CartError) && !string.IsNullOrWhiteSpace(error))
+            CartError = error;
+
         await LoadCartAsync();
     }
 
@@ -39,12 +50,56 @@ public class CartModel : PageModel
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostCheckoutAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            IReadOnlyList<CartLine> lines;
+            try
+            {
+                lines = _cart.GetLines();
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Session unavailable during cart checkout.");
+                TempData["CartError"] = "Your satchel session expired. Add items again, then checkout.";
+                return RedirectToPage();
+            }
+
+            var result = await _checkout.CreateCartCheckoutAsync(lines, Request, cancellationToken);
+            if (!result.Succeeded)
+            {
+                TempData["CartError"] = result.ErrorMessage;
+                return RedirectToPage();
+            }
+
+            return Redirect(result.RedirectUrl!);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error during cart Stripe checkout.");
+            TempData["CartError"] = "Checkout failed. Please try again.";
+            return RedirectToPage();
+        }
+    }
+
     private async Task LoadCartAsync()
     {
         Subtotal = 0;
         HasInvalidLines = false;
 
-        var cartLines = _cart.GetLines();
+        IReadOnlyList<CartLine> cartLines;
+        try
+        {
+            cartLines = _cart.GetLines();
+        }
+        catch (InvalidOperationException)
+        {
+            Lines = [];
+            CartError ??= "Your satchel session expired. Browse the shop to fill it again.";
+            return;
+        }
+
         if (cartLines.Count == 0)
         {
             Lines = [];

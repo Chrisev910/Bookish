@@ -76,7 +76,7 @@
         }
         else
         {
-            <form asp-controller="Stripe" asp-action="CreateCheckoutSession" method="post" class="mt-8 flex flex-col items-center gap-3" data-checkout-loading>
+            <form method="post" asp-page="/Cart" asp-page-handler="Checkout" class="mt-8 flex flex-col items-center gap-3" data-checkout-loading>
                 <button type="submit" class="rounded-2xl bg-gold-500 px-10 py-3.5 text-sm font-bold text-ink shadow-lg shadow-gold-500/25 transition hover:bg-gold-600 hover:shadow-xl">
                     Checkout with Stripe
                 </button>
