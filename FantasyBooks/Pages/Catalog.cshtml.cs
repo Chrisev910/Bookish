@@ -74,7 +74,7 @@ public class CatalogModel : PageModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error during buy-now Stripe checkout.");
-            TempData["FlashMessage"] = "Checkout failed. Please try again.";
+            TempData["FlashMessage"] = $"{ex.GetType().Name}: {ex.Message}";
             return RedirectToPage();
         }
     }

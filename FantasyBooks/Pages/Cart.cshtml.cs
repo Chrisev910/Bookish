@@ -78,7 +78,7 @@ public class CartModel : PageModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error during cart Stripe checkout.");
-            TempData["CartError"] = "Checkout failed. Please try again.";
+            TempData["CartError"] = $"{ex.GetType().Name}: {ex.Message}";
             return RedirectToPage();
         }
     }

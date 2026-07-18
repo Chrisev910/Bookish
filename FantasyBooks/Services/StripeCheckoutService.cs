@@ -17,67 +17,80 @@ public class StripeCheckoutService(
         HttpRequest request,
         CancellationToken cancellationToken)
     {
-        var secretKey = StripeSecretResolver.ResolveSecretKey(configuration);
-        if (string.IsNullOrWhiteSpace(secretKey))
+        try
         {
-            return StripeCheckoutResult.Fail(
-                "Stripe is not configured. Set STRIPE_SECRET_KEY or Stripe__SecretKey on the host.");
-        }
-
-        if (lines.Count == 0)
-            return StripeCheckoutResult.Fail("Your treasury is empty.");
-
-        var productIds = lines.Select(l => l.ProductId).Distinct().ToList();
-        var products = await db.Products
-            .AsNoTracking()
-            .Where(p => productIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, cancellationToken);
-
-        if (products.Count == 0)
-        {
-            return StripeCheckoutResult.Fail(
-                "No matching wares were found in the library. Remove stale lines from your satchel or refill the shop.");
-        }
-
-        if (lines.Any(l => !products.ContainsKey(l.ProductId)))
-        {
-            return StripeCheckoutResult.Fail(
-                "Some satchel lines no longer match the library (often after an import). Remove those rows on this page, then try checkout again.");
-        }
-
-        var lineItems = new List<SessionLineItemOptions>();
-        var tiktokIds = new List<string>();
-
-        foreach (var line in lines)
-        {
-            if (!products.TryGetValue(line.ProductId, out var product))
-                continue;
-
-            if (!string.IsNullOrWhiteSpace(product.TikTokId))
-                tiktokIds.Add(product.TikTokId);
-
-            lineItems.Add(BuildLineItem(product, line.Quantity));
-        }
-
-        if (lineItems.Count == 0)
-            return StripeCheckoutResult.Fail("Could not build a checkout session from the cart.");
-
-        var idBlob = string.Join('|', tiktokIds.Distinct(StringComparer.OrdinalIgnoreCase));
-        if (string.IsNullOrEmpty(idBlob))
-            idBlob = "none";
-
-        return await CreateSessionAsync(
-            secretKey,
-            lineItems,
-            successPath: "/Checkout/Success",
-            cancelPath: "/Cart",
-            metadata: new Dictionary<string, string>
+            var secretKey = StripeSecretResolver.ResolveSecretKey(configuration);
+            if (string.IsNullOrWhiteSpace(secretKey))
             {
-                ["checkout_source"] = "cart",
-                ["tiktok_product_ids"] = TruncateMetadata(idBlob),
-            },
-            request,
-            cancellationToken);
+                return StripeCheckoutResult.Fail(
+                    "Stripe is not configured. Set STRIPE_SECRET_KEY or Stripe__SecretKey on the host.");
+            }
+
+            if (!LooksLikeStripeSecret(secretKey))
+            {
+                return StripeCheckoutResult.Fail(
+                    "Stripe secret key looks invalid (expected sk_test_… or sk_live_…). Check the Render env var.");
+            }
+
+            if (lines.Count == 0)
+                return StripeCheckoutResult.Fail("Your treasury is empty.");
+
+            var productIds = lines.Select(l => l.ProductId).Distinct().ToList();
+            var products = await db.Products
+                .AsNoTracking()
+                .Where(p => productIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+            if (products.Count == 0)
+            {
+                return StripeCheckoutResult.Fail(
+                    "No matching wares were found in the library. Remove stale lines from your satchel or refill the shop.");
+            }
+
+            if (lines.Any(l => !products.ContainsKey(l.ProductId)))
+            {
+                return StripeCheckoutResult.Fail(
+                    "Some satchel lines no longer match the library (often after an import). Remove those rows on this page, then try checkout again.");
+            }
+
+            var lineItems = new List<SessionLineItemOptions>();
+            var tiktokIds = new List<string>();
+
+            foreach (var line in lines)
+            {
+                if (!products.TryGetValue(line.ProductId, out var product))
+                    continue;
+
+                if (!string.IsNullOrWhiteSpace(product.TikTokId))
+                    tiktokIds.Add(product.TikTokId);
+
+                lineItems.Add(BuildLineItem(product, line.Quantity));
+            }
+
+            if (lineItems.Count == 0)
+                return StripeCheckoutResult.Fail("Could not build a checkout session from the cart.");
+
+            var idBlob = string.Join('|', tiktokIds.Distinct(StringComparer.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(idBlob))
+                idBlob = "none";
+
+            return await CreateSessionAsync(
+                secretKey,
+                lineItems,
+                successPath: "/Checkout/Success",
+                cancelPath: "/Cart",
+                metadata: new Dictionary<string, string>
+                {
+                    ["checkout_source"] = "cart",
+                    ["tiktok_product_ids"] = TruncateMetadata(idBlob),
+                },
+                request,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return FailFromException(ex, "cart");
+        }
     }
 
     public async Task<StripeCheckoutResult> CreateBuyNowCheckoutAsync(
@@ -85,35 +98,48 @@ public class StripeCheckoutService(
         HttpRequest request,
         CancellationToken cancellationToken)
     {
-        var secretKey = StripeSecretResolver.ResolveSecretKey(configuration);
-        if (string.IsNullOrWhiteSpace(secretKey))
+        try
         {
-            return StripeCheckoutResult.Fail(
-                "Stripe is not configured. Set STRIPE_SECRET_KEY or Stripe__SecretKey on the host.");
-        }
-
-        if (productId <= 0)
-            return StripeCheckoutResult.Fail("That title could not be found in the library.");
-
-        var product = await db.Products.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
-        if (product is null)
-            return StripeCheckoutResult.Fail("That title could not be found in the library.");
-
-        var tiktokId = string.IsNullOrWhiteSpace(product.TikTokId) ? "none" : product.TikTokId!;
-
-        return await CreateSessionAsync(
-            secretKey,
-            [BuildLineItem(product, quantity: 1)],
-            successPath: "/Checkout/Success",
-            cancelPath: "/Catalog",
-            metadata: new Dictionary<string, string>
+            var secretKey = StripeSecretResolver.ResolveSecretKey(configuration);
+            if (string.IsNullOrWhiteSpace(secretKey))
             {
-                ["checkout_source"] = "buy_now",
-                ["tiktok_product_ids"] = TruncateMetadata(tiktokId),
-            },
-            request,
-            cancellationToken);
+                return StripeCheckoutResult.Fail(
+                    "Stripe is not configured. Set STRIPE_SECRET_KEY or Stripe__SecretKey on the host.");
+            }
+
+            if (!LooksLikeStripeSecret(secretKey))
+            {
+                return StripeCheckoutResult.Fail(
+                    "Stripe secret key looks invalid (expected sk_test_… or sk_live_…). Check the Render env var.");
+            }
+
+            if (productId <= 0)
+                return StripeCheckoutResult.Fail("That title could not be found in the library.");
+
+            var product = await db.Products.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+            if (product is null)
+                return StripeCheckoutResult.Fail("That title could not be found in the library.");
+
+            var tiktokId = string.IsNullOrWhiteSpace(product.TikTokId) ? "none" : product.TikTokId!;
+
+            return await CreateSessionAsync(
+                secretKey,
+                new List<SessionLineItemOptions> { BuildLineItem(product, quantity: 1) },
+                successPath: "/Checkout/Success",
+                cancelPath: "/Catalog",
+                metadata: new Dictionary<string, string>
+                {
+                    ["checkout_source"] = "buy_now",
+                    ["tiktok_product_ids"] = TruncateMetadata(tiktokId),
+                },
+                request,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return FailFromException(ex, "buy-now");
+        }
     }
 
     private async Task<StripeCheckoutResult> CreateSessionAsync(
@@ -134,6 +160,14 @@ public class StripeCheckoutService(
                 "Checkout is misconfigured (public site URL). Set App__PublicBaseUrl to your https://… Render URL.");
         }
 
+        // Stripe requires https success/cancel URLs in live mode.
+        if (secretKey.StartsWith("sk_live_", StringComparison.Ordinal)
+            && !string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return StripeCheckoutResult.Fail(
+                $"Live Stripe keys require an https site URL (got {baseUrl}). Set App__PublicBaseUrl.");
+        }
+
         var options = new SessionCreateOptions
         {
             Mode = "payment",
@@ -142,31 +176,61 @@ public class StripeCheckoutService(
             CancelUrl = $"{baseUrl}{cancelPath}",
             ShippingAddressCollection = new SessionShippingAddressCollectionOptions
             {
-                AllowedCountries = ["US", "CA", "GB", "AU", "NZ", "IE"],
+                AllowedCountries = new List<string> { "US", "CA", "GB", "AU", "NZ", "IE" },
             },
             Metadata = metadata,
         };
 
-        try
-        {
-            var client = new StripeClient(secretKey);
-            var service = new SessionService(client);
-            var checkoutSession = await service.CreateAsync(options, cancellationToken: cancellationToken);
-            if (string.IsNullOrEmpty(checkoutSession.Url))
-                return StripeCheckoutResult.Fail("Stripe did not return a checkout URL.");
+        logger.LogInformation(
+            "Creating Stripe checkout session. BaseUrl={BaseUrl}, LineItems={Count}, KeyMode={KeyMode}",
+            baseUrl,
+            lineItems.Count,
+            secretKey.StartsWith("sk_live_", StringComparison.Ordinal) ? "live" : "test");
 
-            return StripeCheckoutResult.Ok(checkoutSession.Url);
-        }
-        catch (StripeException ex)
-        {
-            logger.LogWarning(ex, "Stripe rejected checkout session create.");
-            return StripeCheckoutResult.Fail($"Stripe: {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Unexpected error creating Stripe checkout session.");
-            return StripeCheckoutResult.Fail("Checkout failed. Please try again.");
-        }
+        var client = new StripeClient(secretKey.Trim());
+        var service = new SessionService(client);
+        var checkoutSession = await service.CreateAsync(options, cancellationToken: cancellationToken);
+        if (string.IsNullOrEmpty(checkoutSession.Url))
+            return StripeCheckoutResult.Fail("Stripe did not return a checkout URL.");
+
+        return StripeCheckoutResult.Ok(checkoutSession.Url);
+    }
+
+    private StripeCheckoutResult FailFromException(Exception ex, string flow)
+    {
+        ex = Unwrap(ex);
+        logger.LogError(ex, "Stripe checkout failed ({Flow}).", flow);
+
+        if (ex is StripeException stripeEx)
+            return StripeCheckoutResult.Fail($"Stripe: {stripeEx.Message}");
+
+        if (ex is OperationCanceledException)
+            return StripeCheckoutResult.Fail("Checkout timed out. Please try again.");
+
+        if (ex is HttpRequestException httpEx)
+            return StripeCheckoutResult.Fail($"Could not reach Stripe: {httpEx.Message}");
+
+        return StripeCheckoutResult.Fail($"{ex.GetType().Name}: {ex.Message}");
+    }
+
+    private static Exception Unwrap(Exception ex)
+    {
+        while (ex is AggregateException { InnerExceptions.Count: 1 } agg)
+            ex = agg.InnerExceptions[0];
+
+        if (ex.InnerException is StripeException stripeInner)
+            return stripeInner;
+
+        return ex;
+    }
+
+    private static bool LooksLikeStripeSecret(string secretKey)
+    {
+        var key = secretKey.Trim();
+        return key.StartsWith("sk_test_", StringComparison.Ordinal)
+            || key.StartsWith("sk_live_", StringComparison.Ordinal)
+            || key.StartsWith("rk_test_", StringComparison.Ordinal)
+            || key.StartsWith("rk_live_", StringComparison.Ordinal);
     }
 
     private static SessionLineItemOptions BuildLineItem(Models.Product product, int quantity)
