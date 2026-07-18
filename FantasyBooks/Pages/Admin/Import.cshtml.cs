@@ -172,6 +172,7 @@ public class ImportModel : PageModel
             var batchIds = pendingIds.Take(CacheRemoteImagesBatchSize).ToList();
             var cached = 0;
             var failed = 0;
+            var failureNotes = new List<string>();
 
             foreach (var id in batchIds)
             {
@@ -185,25 +186,37 @@ public class ImportModel : PageModel
                 var url = product.ImageUrl;
                 try
                 {
-                    await _imageFetcher.ApplyAsync(product, url, cancellationToken);
+                    var applyError = await _imageFetcher.ApplyAsync(product, url, cancellationToken);
+                    if (applyError is not null)
+                    {
+                        failed++;
+                        if (failureNotes.Count < 3)
+                            failureNotes.Add($"#{id}: {applyError}");
+                        continue;
+                    }
+
                     await _db.SaveChangesAsync(cancellationToken);
 
                     if (product.HasUploadedImage)
                         cached++;
                     else
+                    {
                         failed++;
+                        if (failureNotes.Count < 3)
+                            failureNotes.Add($"#{id}: saved but image missing");
+                    }
                 }
                 catch (Exception ex)
                 {
                     failed++;
                     _logger.LogError(ex, "Failed caching remote image for product {ProductId}", id);
+                    if (failureNotes.Count < 3)
+                        failureNotes.Add($"#{id}: save error — {ex.Message}");
                     DetachAllTracked();
                 }
             }
 
-            var remainingAfter = Math.Max(0, remainingBefore - batchIds.Count);
-            // Recount accurately for the flash (some may have failed and still need work).
-            remainingAfter = await _db.Products
+            var remainingAfter = await _db.Products
                 .AsNoTracking()
                 .CountAsync(
                     p =>
@@ -212,9 +225,13 @@ public class ImportModel : PageModel
                         && (p.ImageContentType == null || p.ImageContentType == ""),
                     cancellationToken);
 
+            var detail = failureNotes.Count > 0
+                ? " Reasons: " + string.Join("; ", failureNotes)
+                : "";
+
             TempData["FlashMessage"] = remainingAfter > 0
-                ? $"Remote image cache: cached {cached}, failed {failed} this run. {remainingAfter} still need caching — click Cache remote images again."
-                : $"Remote image cache: cached {cached}, failed {failed}. All done.";
+                ? $"Remote image cache: cached {cached}, failed {failed} this run. {remainingAfter} still need caching — click Cache remote images again.{detail}"
+                : $"Remote image cache: cached {cached}, failed {failed}. All done.{detail}";
         }
         catch (Exception ex)
         {

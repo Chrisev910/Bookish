@@ -85,8 +85,10 @@ builder.Services.AddSession(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient(ProductRemoteImageFetcher.HttpClientName, client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("BookishInkPaper/1.0 (+https://github.com/Chrisev910/Bookish)");
+    client.Timeout = TimeSpan.FromSeconds(45);
+    // Browser-like UA: some CDNs (including TikTok Shop) reject custom bot agents with 403.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 });
 builder.Services.AddScoped<ProductRemoteImageFetcher>();
 builder.Services.AddScoped<CartService>();

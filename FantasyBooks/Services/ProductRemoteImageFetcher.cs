@@ -7,6 +7,9 @@ public sealed class ProductRemoteImageFetcher
 {
     public const string HttpClientName = "ProductRemoteImages";
 
+    /// <summary>Remote product photos are often larger than admin uploads; allow up to 8 MB.</summary>
+    public const long MaxRemoteBytes = 8 * 1024 * 1024;
+
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/jpeg",
@@ -28,115 +31,187 @@ public sealed class ProductRemoteImageFetcher
 
     /// <summary>
     /// Downloads <paramref name="imageUrl"/> when the product needs a (new) blob.
-    /// On success: sets <see cref="Product.ImageData"/> / <see cref="Product.ImageContentType"/> and clears <see cref="Product.ImageUrl"/>
-    /// so the shop serves <c>/media/products/{id}</c> only (no TikTok CDN dependency).
-    /// On failure: sets <see cref="Product.ImageUrl"/> so the shop can still show the remote image.
-    /// Skips when a blob already exists and the stored URL is unchanged, or when a blob exists and
-    /// <see cref="Product.ImageUrl"/> was already cleared (prior successful cache — re-import same listing).
-    /// Re-downloads when a blob exists but <see cref="Product.ImageUrl"/> is still set and differs.
+    /// On success: sets <see cref="Product.ImageData"/> / <see cref="Product.ImageContentType"/> and clears <see cref="Product.ImageUrl"/>.
+    /// On failure: keeps/sets <see cref="Product.ImageUrl"/> and returns a short reason.
     /// </summary>
-    public async Task ApplyAsync(Product product, string? imageUrl, CancellationToken cancellationToken = default)
+    public async Task<string?> ApplyAsync(Product product, string? imageUrl, CancellationToken cancellationToken = default)
     {
-        var url = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl.Trim();
+        var url = NormalizeUrl(imageUrl);
         if (url is null)
-            return;
+            return "missing or invalid image URL";
 
         var hasBlob = product.HasUploadedImage;
-        var previousUrl = string.IsNullOrWhiteSpace(product.ImageUrl) ? null : product.ImageUrl.Trim();
+        var previousUrl = NormalizeUrl(product.ImageUrl);
 
         // Blob present and either already cached (URL cleared) or same remote URL as last attempt.
         if (hasBlob && (previousUrl is null || UrlsEqual(previousUrl, url)))
-            return;
+            return null;
 
-        var downloaded = await TryDownloadAsync(url, cancellationToken);
+        var (downloaded, error) = await TryDownloadAsync(url, cancellationToken);
         if (downloaded is null)
         {
             product.ImageUrl = url;
-            return;
+            return error ?? "download failed";
         }
 
         product.ImageData = downloaded.Value.Data;
         product.ImageContentType = downloaded.Value.ContentType;
         product.ImageUrl = null;
+        return null;
     }
 
-    public async Task<(byte[] Data, string ContentType)?> TryDownloadAsync(
+    public async Task<((byte[] Data, string ContentType)? Result, string? Error)> TryDownloadAsync(
         string imageUrl,
         CancellationToken cancellationToken = default)
+    {
+        var candidates = BuildCandidateUrls(imageUrl);
+        string? lastError = null;
+
+        foreach (var candidate in candidates)
+        {
+            var (result, error) = await TryDownloadOneAsync(candidate, cancellationToken);
+            if (result is not null)
+                return (result, null);
+
+            lastError = error;
+        }
+
+        return (null, lastError ?? "download failed");
+    }
+
+    private async Task<((byte[] Data, string ContentType)? Result, string? Error)> TryDownloadOneAsync(
+        string imageUrl,
+        CancellationToken cancellationToken)
     {
         if (!Uri.TryCreate(imageUrl.Trim(), UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            _logger.LogWarning("Skipping remote image with invalid URL: {Url}", imageUrl);
-            return null;
+            return (null, "invalid URL");
         }
 
         try
         {
             var client = _httpClientFactory.CreateClient(HttpClientName);
-            using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            request.Headers.TryAddWithoutValidation(
+                "Accept",
+                "image/avif,image/webp,image/apng,image/*,*/*;q=0.8");
+            request.Headers.TryAddWithoutValidation("Referer", "https://seller.tiktok.com/");
+            request.Headers.TryAddWithoutValidation("Accept-Language", "en-GB,en;q=0.9");
+
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning(
-                    "Remote image download failed ({StatusCode}): {Url}",
-                    (int)response.StatusCode,
-                    uri);
-                return null;
+                var msg = $"HTTP {(int)response.StatusCode} from CDN";
+                _logger.LogWarning("Remote image download failed ({StatusCode}): {Url}", (int)response.StatusCode, uri);
+                return (null, msg);
             }
 
-            if (response.Content.Headers.ContentLength is > ProductImageUpload.MaxBytes)
+            if (response.Content.Headers.ContentLength is > MaxRemoteBytes)
             {
-                _logger.LogWarning(
-                    "Remote image too large ({Length} bytes): {Url}",
-                    response.Content.Headers.ContentLength,
-                    uri);
-                return null;
+                var msg = $"image too large ({response.Content.Headers.ContentLength} bytes)";
+                _logger.LogWarning("Remote image too large ({Length} bytes): {Url}", response.Content.Headers.ContentLength, uri);
+                return (null, msg);
             }
 
-            var contentType = NormalizeContentType(response.Content.Headers.ContentType?.MediaType)
+            var headerType = NormalizeContentType(response.Content.Headers.ContentType?.MediaType)
                 ?? GuessContentType(uri.AbsolutePath);
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var ms = new MemoryStream(capacity: (int)Math.Min(ProductImageUpload.MaxBytes, 64 * 1024));
+            using var ms = new MemoryStream(capacity: 64 * 1024);
             var buffer = new byte[8192];
             long total = 0;
             int read;
             while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
             {
                 total += read;
-                if (total > ProductImageUpload.MaxBytes)
+                if (total > MaxRemoteBytes)
                 {
                     _logger.LogWarning("Remote image exceeded size limit while reading: {Url}", uri);
-                    return null;
+                    return (null, $"image too large (>{MaxRemoteBytes} bytes)");
                 }
 
                 ms.Write(buffer, 0, read);
             }
 
             if (ms.Length == 0)
-            {
-                _logger.LogWarning("Remote image was empty: {Url}", uri);
-                return null;
-            }
+                return (null, "empty response");
 
             var bytes = ms.ToArray();
-            contentType ??= GuessContentTypeFromBytes(bytes);
+            var contentType = headerType ?? GuessContentTypeFromBytes(bytes);
+            // TikTok sometimes sends octet-stream; trust magic bytes.
             if (contentType is null || !AllowedContentTypes.Contains(contentType))
             {
-                _logger.LogWarning(
-                    "Remote image has unsupported type ({ContentType}): {Url}",
-                    contentType ?? "(unknown)",
-                    uri);
-                return null;
+                contentType = GuessContentTypeFromBytes(bytes);
             }
 
-            return (bytes, contentType);
+            if (contentType is null || !AllowedContentTypes.Contains(contentType))
+            {
+                var msg = $"unsupported type ({headerType ?? "unknown"})";
+                _logger.LogWarning("Remote image has unsupported type ({ContentType}): {Url}", headerType ?? "(unknown)", uri);
+                return (null, msg);
+            }
+
+            return ((bytes, contentType), null);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
             _logger.LogWarning(ex, "Remote image download error: {Url}", uri);
-            return null;
+            return (null, ex is TaskCanceledException ? "download timed out" : $"network error: {ex.Message}");
         }
+    }
+
+    /// <summary>Prefer a moderately sized TikTok resize variant, then the original URL.</summary>
+    private static IReadOnlyList<string> BuildCandidateUrls(string imageUrl)
+    {
+        var primary = NormalizeUrl(imageUrl);
+        if (primary is null)
+            return [];
+
+        var list = new List<string>();
+        var resized = TryTikTokResizeVariant(primary, 1000);
+        if (resized is not null && !UrlsEqual(resized, primary))
+            list.Add(resized);
+
+        list.Add(primary);
+        return list;
+    }
+
+    private static string? TryTikTokResizeVariant(string url, int maxEdge)
+    {
+        // ...~tplv-{id}-origin-jpeg.jpeg → ...~tplv-{id}-resize-jpeg:{n}:{n}.jpeg
+        const string marker = "-origin-jpeg.";
+        var idx = url.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0)
+            return null;
+
+        var prefix = url[..idx];
+        var suffix = url[(idx + marker.Length - 1)..]; // keep leading '.'
+        return $"{prefix}-resize-jpeg:{maxEdge}:{maxEdge}{suffix}";
+    }
+
+    private static string? NormalizeUrl(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl))
+            return null;
+
+        // Excel / TikTok exports sometimes join several URLs.
+        var raw = imageUrl.Trim();
+        foreach (var sep in new[] { '|', '\n', '\r', ';', ',' })
+        {
+            var cut = raw.IndexOf(sep);
+            if (cut > 0)
+                raw = raw[..cut].Trim();
+        }
+
+        if (raw.StartsWith("//", StringComparison.Ordinal))
+            raw = "https:" + raw;
+
+        return string.IsNullOrWhiteSpace(raw) ? null : raw;
     }
 
     private static bool UrlsEqual(string a, string b) =>
@@ -157,6 +232,10 @@ public sealed class ProductRemoteImageFetcher
     private static string? GuessContentType(string? path)
     {
         var ext = Path.GetExtension(path)?.ToLowerInvariant();
+        // TikTok paths often end in ".jpeg" after long template names.
+        if (path is not null && path.Contains("jpeg", StringComparison.OrdinalIgnoreCase) && ext is ".jpeg" or ".jpg" or "")
+            return "image/jpeg";
+
         return ext switch
         {
             ".jpg" or ".jpeg" => "image/jpeg",
