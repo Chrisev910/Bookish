@@ -159,7 +159,7 @@ using (var scope = app.Services.CreateScope())
         await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode = WAL;");
     }
 
-    await LibrarySchemaPatch.ApplyAsync(context);
+    await LibrarySchemaPatch.ApplyAsync(context, logger: logger);
     SeedData.Initialize(context);
 }
 

@@ -1,11 +1,11 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FantasyBooks.Data;
 
 /// <summary>
-/// SQLite databases created before newer columns existed are not upgraded by <c>EnsureCreated()</c>.
-/// Applies additive columns, one-time backfills, then drops legacy columns removed from the model.
+/// SQLite/Turso databases created before newer columns existed are not upgraded by <c>EnsureCreated()</c>.
+/// Applies additive columns with best-effort ALTER TABLE (safe if column already exists).
 /// </summary>
 public static class LibrarySchemaPatch
 {
@@ -20,114 +20,50 @@ public static class LibrarySchemaPatch
         "TikTokProductId",
     ];
 
-    public static async Task ApplyAsync(LibraryContext db, CancellationToken cancellationToken = default)
+    public static async Task ApplyAsync(
+        LibraryContext db,
+        CancellationToken cancellationToken = default,
+        ILogger? logger = null)
     {
-        await AddColumnIfMissingAsync(db, "ImageUrl", """ALTER TABLE "Products" ADD COLUMN "ImageUrl" TEXT NULL;""", cancellationToken);
-        await AddColumnIfMissingAsync(db, "TikTokId", """ALTER TABLE "Products" ADD COLUMN "TikTokId" TEXT NULL;""", cancellationToken);
-        await AddColumnIfMissingAsync(db, "ImageContentType", """ALTER TABLE "Products" ADD COLUMN "ImageContentType" TEXT NULL;""", cancellationToken);
-        await AddColumnIfMissingAsync(db, "ImageData", """ALTER TABLE "Products" ADD COLUMN "ImageData" BLOB NULL;""", cancellationToken);
+        await TryExecAsync(db, """ALTER TABLE "Products" ADD COLUMN "ImageUrl" TEXT NULL;""", logger, cancellationToken);
+        await TryExecAsync(db, """ALTER TABLE "Products" ADD COLUMN "TikTokId" TEXT NULL;""", logger, cancellationToken);
+        await TryExecAsync(db, """ALTER TABLE "Products" ADD COLUMN "ImageContentType" TEXT NULL;""", logger, cancellationToken);
+        await TryExecAsync(db, """ALTER TABLE "Products" ADD COLUMN "ImageData" BLOB NULL;""", logger, cancellationToken);
 
-        await BackfillTikTokIdsAsync(db, cancellationToken);
+        await TryExecAsync(
+            db,
+            """
+            UPDATE "Products" SET "TikTokId" = "TikTokProductId"
+            WHERE ("TikTokId" IS NULL OR TRIM("TikTokId") = '')
+              AND "TikTokProductId" IS NOT NULL AND TRIM("TikTokProductId") != '';
+            """,
+            logger,
+            cancellationToken);
 
         foreach (var col in LegacyColumnsToDrop)
-            await DropColumnIfExistsAsync(db, col, cancellationToken);
-    }
-
-    private static async Task AddColumnIfMissingAsync(
-        LibraryContext db,
-        string columnName,
-        string alterSql,
-        CancellationToken cancellationToken)
-    {
-        await db.Database.OpenConnectionAsync(cancellationToken);
-        long hasColumn;
-        try
         {
-            await using var cmd = db.Database.GetDbConnection().CreateCommand();
-            var safeName = columnName.Replace("'", "''", StringComparison.Ordinal);
-            cmd.CommandText = $"""
-                SELECT COUNT(1) FROM pragma_table_info('Products') WHERE name='{safeName}';
-                """;
-            var scalar = await cmd.ExecuteScalarAsync(cancellationToken);
-            hasColumn = Convert.ToInt64(scalar ?? 0L);
-        }
-        finally
-        {
-            await db.Database.CloseConnectionAsync();
-        }
-
-        if (hasColumn > 0)
-            return;
-
-        try
-        {
-            await db.Database.ExecuteSqlRawAsync(alterSql, cancellationToken);
-        }
-        catch (Exception ex) when (ex is SqliteException || ex.GetType().Name.Contains("LibSQL", StringComparison.Ordinal))
-        {
-            if (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
-                return;
-            throw;
-        }
-    }
-
-    private static async Task BackfillTikTokIdsAsync(LibraryContext db, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await db.Database.ExecuteSqlRawAsync(
-                """
-                UPDATE "Products" SET "TikTokId" = "TikTokProductId"
-                WHERE ("TikTokId" IS NULL OR TRIM("TikTokId") = '')
-                  AND "TikTokProductId" IS NOT NULL AND TRIM("TikTokProductId") != '';
-                """,
+            await TryExecAsync(
+                db,
+                $"""ALTER TABLE "Products" DROP COLUMN "{col}";""",
+                logger,
                 cancellationToken);
         }
-        catch (Exception)
-        {
-            // Column or table missing on very old DBs / remote libSQL quirks
-        }
     }
 
-    private static async Task DropColumnIfExistsAsync(LibraryContext db, string columnName, CancellationToken cancellationToken)
+    private static async Task TryExecAsync(
+        LibraryContext db,
+        string sql,
+        ILogger? logger,
+        CancellationToken cancellationToken)
     {
-        await db.Database.OpenConnectionAsync(cancellationToken);
-        long exists;
         try
         {
-            await using var cmd = db.Database.GetDbConnection().CreateCommand();
-            cmd.CommandText = $"""
-                SELECT COUNT(1) FROM pragma_table_info('Products') WHERE name='{columnName.Replace("'", "''", StringComparison.Ordinal)}';
-                """;
-            var scalar = await cmd.ExecuteScalarAsync(cancellationToken);
-            exists = Convert.ToInt64(scalar ?? 0L);
+            await db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
         }
-        finally
+        catch (Exception ex)
         {
-            await db.Database.CloseConnectionAsync();
-        }
-
-        if (exists == 0)
-            return;
-
-        try
-        {
-            var dropSql = columnName switch
-            {
-                "Category" => """ALTER TABLE "Products" DROP COLUMN "Category";""",
-                "StockQuantity" => """ALTER TABLE "Products" DROP COLUMN "StockQuantity";""",
-                "Weight" => """ALTER TABLE "Products" DROP COLUMN "Weight";""",
-                "IsBundle" => """ALTER TABLE "Products" DROP COLUMN "IsBundle";""",
-                "BundleItems" => """ALTER TABLE "Products" DROP COLUMN "BundleItems";""",
-                "Rarity" => """ALTER TABLE "Products" DROP COLUMN "Rarity";""",
-                "TikTokProductId" => """ALTER TABLE "Products" DROP COLUMN "TikTokProductId";""",
-                _ => throw new InvalidOperationException($"Unexpected legacy column: {columnName}"),
-            };
-            await db.Database.ExecuteSqlRawAsync(dropSql, cancellationToken);
-        }
-        catch (Exception)
-        {
-            // Older SQLite / remote libSQL or unexpected schema — leave table as-is
+            // Duplicate column / missing legacy column / Turso DDL quirks — never fail startup.
+            logger?.LogDebug(ex, "Schema patch statement skipped: {Sql}", sql.Trim());
         }
     }
 }

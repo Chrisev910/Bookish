@@ -58,8 +58,14 @@ public sealed class TursoEfConnection : DbConnection
     protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) =>
         new TursoEfTransaction(_inner.BeginTransaction(isolationLevel), this);
 
-    protected override DbCommand CreateDbCommand() =>
-        new TursoEfCommand(_inner.CreateCommand(), this);
+    protected override DbCommand CreateDbCommand()
+    {
+        var cmd = _inner.CreateCommand();
+        // LibSQL sometimes returns commands with a null Connection; EF then NREs on execute.
+        if (cmd.Connection is null)
+            cmd.Connection = _inner;
+        return new TursoEfCommand(cmd, this);
+    }
 
     protected override void Dispose(bool disposing)
     {
@@ -172,27 +178,60 @@ internal sealed class TursoEfCommand(DbCommand inner, TursoEfConnection owner) :
 
     public override void Cancel() => inner.Cancel();
 
-    public override int ExecuteNonQuery() => inner.ExecuteNonQuery();
+    public override int ExecuteNonQuery()
+    {
+        EnsureInnerConnection();
+        return inner.ExecuteNonQuery();
+    }
 
-    public override object? ExecuteScalar() => inner.ExecuteScalar();
+    public override object? ExecuteScalar()
+    {
+        EnsureInnerConnection();
+        return inner.ExecuteScalar();
+    }
 
-    public override void Prepare() => inner.Prepare();
+    public override void Prepare()
+    {
+        EnsureInnerConnection();
+        inner.Prepare();
+    }
 
     protected override DbParameter CreateDbParameter() => inner.CreateParameter();
 
-    protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) =>
-        inner.ExecuteReader(behavior);
+    protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+    {
+        EnsureInnerConnection();
+        return inner.ExecuteReader(behavior);
+    }
 
-    public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) =>
-        inner.ExecuteNonQueryAsync(cancellationToken);
+    public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken)
+    {
+        EnsureInnerConnection();
+        return inner.ExecuteNonQueryAsync(cancellationToken);
+    }
 
-    public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) =>
-        inner.ExecuteScalarAsync(cancellationToken);
+    public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken)
+    {
+        EnsureInnerConnection();
+        return inner.ExecuteScalarAsync(cancellationToken);
+    }
 
     protected override Task<DbDataReader> ExecuteDbDataReaderAsync(
         CommandBehavior behavior,
-        CancellationToken cancellationToken) =>
-        inner.ExecuteReaderAsync(behavior, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        EnsureInnerConnection();
+        return inner.ExecuteReaderAsync(behavior, cancellationToken);
+    }
+
+    private void EnsureInnerConnection()
+    {
+        if (inner.Connection is null)
+            inner.Connection = owner.Inner;
+
+        if (owner.State != ConnectionState.Open)
+            owner.Open();
+    }
 
     protected override void Dispose(bool disposing)
     {
