@@ -2,6 +2,7 @@ using System.Globalization;
 using FantasyBooks.Data;
 using FantasyBooks.Options;
 using FantasyBooks.Services;
+using FantasyBooks.ViewComponents;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -65,6 +66,7 @@ builder.Services.PostConfigure<StripeOptions>(opts =>
 });
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+builder.Services.Configure<TikTokFeedOptions>(builder.Configuration.GetSection(TikTokFeedOptions.SectionName));
 
 // Behind Render, Request.IsHttps can still be wrong when cookies are written. SameAsRequest
 // avoids dropping Secure session/antiforgery cookies on the internal HTTP hop.
@@ -83,6 +85,7 @@ builder.Services.AddSession(options =>
     options.Cookie.SecurePolicy = cookieSecurePolicy;
 });
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient(ProductRemoteImageFetcher.HttpClientName, client =>
 {
     client.Timeout = TimeSpan.FromSeconds(45);
@@ -90,10 +93,21 @@ builder.Services.AddHttpClient(ProductRemoteImageFetcher.HttpClientName, client 
     client.DefaultRequestHeaders.UserAgent.ParseAdd(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 });
+builder.Services.AddHttpClient(TikTokFooterFeedViewComponent.HttpClientName, client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(8);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "Mozilla/5.0 (compatible; BookishInkPaper/1.0; +https://github.com/Chrisev910/Bookish)");
+});
+builder.Services.AddHttpClient(TikTokFeedSyncService.HttpClientName, client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddScoped<ProductRemoteImageFetcher>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<StripeCheckoutService>();
 builder.Services.AddScoped<TikTokIntegrationService>();
+builder.Services.AddScoped<TikTokFeedSyncService>();
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.SameSite = SameSiteMode.Lax;
@@ -271,6 +285,16 @@ static void ApplyAdminFromEnvironment(ConfigurationManager config)
         ?? Environment.GetEnvironmentVariable("Turso__AuthToken");
     if (!string.IsNullOrWhiteSpace(tursoToken) && string.IsNullOrWhiteSpace(config["Turso:AuthToken"]))
         updates["Turso:AuthToken"] = tursoToken.Trim();
+
+    var feedUser = Environment.GetEnvironmentVariable("TIKTOK_FEED_USERNAME")
+        ?? Environment.GetEnvironmentVariable("TikTokFeed__Username");
+    if (!string.IsNullOrWhiteSpace(feedUser) && string.IsNullOrWhiteSpace(config["TikTokFeed:Username"]))
+        updates["TikTokFeed:Username"] = feedUser.Trim().TrimStart('@');
+
+    var feedKey = Environment.GetEnvironmentVariable("TIKTOK_FEED_RAPIDAPI_KEY")
+        ?? Environment.GetEnvironmentVariable("TikTokFeed__RapidApiKey");
+    if (!string.IsNullOrWhiteSpace(feedKey) && string.IsNullOrWhiteSpace(config["TikTokFeed:RapidApiKey"]))
+        updates["TikTokFeed:RapidApiKey"] = feedKey.Trim();
 
     if (updates.Count > 0)
         config.AddInMemoryCollection(updates);

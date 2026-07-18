@@ -1,0 +1,24 @@
+@model IReadOnlyList<FantasyBooks.ViewComponents.TikTokEmbedItem>
+@if (Model is { Count: > 0 })
+{
+<section class="border-t border-ink/10 bg-paper/80 py-8 backdrop-blur-md" aria-label="TikTok from the shop">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div class="mb-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.28em] text-gold-600">On TikTok</p>
+            <h2 class="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Shorts from the shelves</h2>
+            <p class="mt-1 max-w-xl text-sm text-ink/55">Swipe through recent clips — tap a card to watch on TikTok.</p>
+        </div>
+
+        <div class="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] md:grid md:grid-cols-2 md:overflow-visible md:pb-0 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden">
+            @foreach (var item in Model)
+            {
+                <article class="w-[78vw] max-w-xs shrink-0 snap-center overflow-hidden rounded-2xl border border-ink/10 bg-white/45 shadow-float backdrop-blur-sm md:w-auto md:max-w-none">
+                    <div class="tiktok-embed-host">
+                        @Html.Raw(item.EmbedHtml)
+                    </div>
+                </article>
+            }
+        </div>
+    </div>
+</section>
+}

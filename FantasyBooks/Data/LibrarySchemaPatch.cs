@@ -38,6 +38,19 @@ public static class LibrarySchemaPatch
         await TryExecAsync(
             db,
             """
+            CREATE TABLE IF NOT EXISTS "TikTokVideos" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_TikTokVideos" PRIMARY KEY AUTOINCREMENT,
+                "VideoUrl" TEXT NOT NULL,
+                "IsActive" INTEGER NOT NULL DEFAULT 1,
+                "DateCreated" TEXT NOT NULL
+            );
+            """,
+            logger,
+            cancellationToken);
+
+        await TryExecAsync(
+            db,
+            """
             UPDATE "Products" SET "TikTokId" = "TikTokProductId"
             WHERE ("TikTokId" IS NULL OR TRIM("TikTokId") = '')
               AND "TikTokProductId" IS NOT NULL AND TRIM("TikTokProductId") != '';

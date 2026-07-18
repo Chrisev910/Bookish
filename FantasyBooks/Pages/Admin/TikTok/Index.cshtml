@@ -1,0 +1,134 @@
+@page "/Admin/TikTok"
+@model FantasyBooks.Pages.Admin.TikTok.IndexModel
+@{
+    ViewData["Title"] = "TikTok feed";
+    ViewData["LibraryDatabase"] = Model.DatabaseDescription;
+}
+
+<div class="mx-auto max-w-4xl space-y-8 pb-8">
+    @if (!string.IsNullOrEmpty(Model.FlashMessage))
+    {
+        <div class="rounded-2xl border border-ink/12 bg-white/45 px-5 py-4 text-sm font-medium text-ink shadow-float backdrop-blur-[10px] ring-1 ring-gold-500/20" role="status">
+            @Model.FlashMessage
+        </div>
+    }
+
+    <header class="rounded-2xl border border-ink/10 bg-white/35 px-6 py-8 text-center shadow-float backdrop-blur-[10px] sm:px-10">
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-ink/45">Social</p>
+        <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">TikTok feed</h1>
+        <p class="mx-auto mt-3 max-w-xl text-sm text-ink/60">
+            Sync the latest posts from your TikTok account into the shop footer, or paste individual video links.
+        </p>
+        <div class="mt-6">
+            <partial name="../_AdminNav" />
+        </div>
+    </header>
+
+    <section class="rounded-2xl border border-ink/10 bg-white/35 p-6 shadow-float backdrop-blur-[10px] sm:p-8">
+        <h2 class="font-display text-xl font-semibold text-ink">Sync latest from account</h2>
+        <p class="mt-2 text-sm text-ink/60">
+            Pulls the newest videos via RapidAPI (<span class="font-mono text-xs">tiktok-scraper7</span>) and replaces the footer list.
+            @(Model.FeedApiConfigured
+                ? "API key is configured."
+                : "API key not set yet — add TikTokFeed__RapidApiKey on Render (see setup notes).")
+        </p>
+        <form method="post" asp-page-handler="SyncFeed" class="mt-5 space-y-5">
+            <div>
+                <label asp-for="SyncInput.Username" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>
+                <input asp-for="SyncInput.Username"
+                       placeholder="yourshop"
+                       class="w-full rounded-xl border border-ink/15 bg-white/60 px-4 py-3 text-sm text-ink placeholder:text-ink/35 focus:border-gold-500/50 focus:outline-none focus:ring-2 focus:ring-gold-500/25" />
+                <p class="mt-1 text-xs text-ink/45">Handle only — no @("@"). Example: bookishinkpaper</p>
+            </div>
+            <button type="submit"
+                    class="magical-glow-btn rounded-xl bg-gold-500 px-7 py-3 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600 @(Model.FeedApiConfigured ? "" : "opacity-80")">
+                Sync latest videos
+            </button>
+        </form>
+    </section>
+
+    <section class="rounded-2xl border border-ink/10 bg-white/35 p-6 shadow-float backdrop-blur-[10px] sm:p-8">
+        <h2 class="font-display text-xl font-semibold text-ink">Add a video manually</h2>
+        <form method="post" class="mt-5 space-y-5">
+            <div>
+                <label asp-for="Input.VideoUrl" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>
+                <input asp-for="Input.VideoUrl"
+                       placeholder="https://www.tiktok.com/@@account/video/…"
+                       class="w-full rounded-xl border border-ink/15 bg-white/60 px-4 py-3 text-sm text-ink placeholder:text-ink/35 focus:border-gold-500/50 focus:outline-none focus:ring-2 focus:ring-gold-500/25" />
+                <span asp-validation-for="Input.VideoUrl" class="mt-1 block text-xs text-red-700"></span>
+            </div>
+            <label class="flex items-center gap-3 text-sm text-ink/80">
+                <input asp-for="Input.IsActive" class="h-4 w-4 rounded border-ink/25 text-gold-600 focus:ring-gold-500/40" />
+                <span asp-for="Input.IsActive" class="font-medium"></span>
+            </label>
+            <button type="submit" class="rounded-xl border border-ink/15 bg-white/55 px-6 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-gold-500/40 hover:bg-white/70">
+                Save video
+            </button>
+        </form>
+    </section>
+
+    @if (Model.Videos.Count == 0)
+    {
+        <p class="rounded-2xl border border-dashed border-ink/15 bg-white/35 px-6 py-12 text-center text-ink/60 backdrop-blur-sm">
+            No TikTok videos yet. Sync from your account or paste a link above.
+        </p>
+    }
+    else
+    {
+        <div class="overflow-hidden rounded-2xl border border-ink/10 bg-white/35 shadow-float backdrop-blur-[10px]">
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-ink/10 bg-white/40 text-xs font-semibold uppercase tracking-wider text-ink/50">
+                        <th class="px-4 py-3">URL</th>
+                        <th class="px-3 py-3">Status</th>
+                        <th class="px-3 py-3">Added</th>
+                        <th class="px-4 py-3 text-right"><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ink/10">
+                    @foreach (var v in Model.Videos)
+                    {
+                        <tr class="text-ink">
+                            <td class="max-w-[14rem] px-4 py-3 sm:max-w-md">
+                                <a href="@v.VideoUrl" target="_blank" rel="noopener noreferrer"
+                                   class="break-all font-medium text-ink/80 underline decoration-gold-500/40 underline-offset-2 hover:text-gold-600">
+                                    @v.VideoUrl
+                                </a>
+                            </td>
+                            <td class="px-3 py-3">
+                                @if (v.IsActive)
+                                {
+                                    <span class="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-900">Live</span>
+                                }
+                                else
+                                {
+                                    <span class="rounded-full bg-ink/8 px-2.5 py-0.5 text-xs font-semibold text-ink/50">Hidden</span>
+                                }
+                            </td>
+                            <td class="px-3 py-3 text-xs tabular-nums text-ink/50">
+                                @v.DateCreated.ToString("yyyy-MM-dd")
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                    <form method="post" asp-page-handler="Toggle" asp-route-id="@v.Id">
+                                        <button type="submit"
+                                                class="rounded-lg border border-ink/15 bg-white/50 px-2.5 py-1 text-xs font-medium text-ink/70 transition hover:border-gold-500/40 hover:text-gold-600">
+                                            @(v.IsActive ? "Hide" : "Show")
+                                        </button>
+                                    </form>
+                                    <form method="post" asp-page-handler="Delete" asp-route-id="@v.Id"
+                                          onsubmit="return confirm('Remove this TikTok video from the feed?');">
+                                        <button type="submit"
+                                                class="rounded-lg border border-red-300/60 bg-red-50/50 px-2.5 py-1 text-xs font-medium text-red-900 transition hover:bg-red-100/70">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

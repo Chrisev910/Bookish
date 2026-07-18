@@ -240,3 +240,18 @@ body.noise-root {
   color: rgba(15, 23, 42, 0.38);
   font-style: normal;
 }
+
+/* TikTok footer oEmbed cards */
+.tiktok-embed-host {
+  min-height: 12rem;
+}
+
+.tiktok-embed-host blockquote.tiktok-embed,
+.tiktok-embed-host .tiktok-embed {
+  margin: 0 !important;
+  max-width: 100% !important;
+}
+
+.tiktok-embed-host iframe {
+  max-width: 100% !important;
+}
