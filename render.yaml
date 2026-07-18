@@ -1,13 +1,21 @@
 # Blueprint: https://render.com/docs/blueprint-spec
-# After first deploy, set Stripe keys in the Render dashboard (Environment), e.g.:
+#
+# After first deploy, set in the Render dashboard (Environment):
 #   Stripe__SecretKey   or   STRIPE_SECRET_KEY
 #   Stripe__PublishableKey   or   STRIPE_PUBLISHABLE_KEY
 # Optional Docker-style file path: STRIPE_SECRET_KEY_FILE=/run/secrets/stripe_secret
+#
+# Persist catalog across redeploys (free): create a Turso database, then set:
+#   TURSO_DATABASE_URL   e.g. libsql://your-db-org.turso.io
+#   TURSO_AUTH_TOKEN     database auth token from Turso
+# Without these, the app uses ephemeral local SQLite (lost on redeploy).
+#
+# Admin login (defaults exist in appsettings; override in production):
+#   Admin__Username   or   ADMIN_USERNAME
+#   Admin__Password   or   ADMIN_PASSWORD
+#
 # RENDER_EXTERNAL_URL is set by Render and used for Stripe success/cancel links.
 # Optional override: App__PublicBaseUrl=https://your-service.onrender.com
-# SQLite lives on the instance filesystem; data is lost on redeploy unless you add a persistent disk
-# and set ConnectionStrings__Library to e.g. Data Source=/data/library.db
-# Optional persistent disk also keeps antiforgery keys: DATA_PROTECTION_KEYS_PATH=/data/dp-keys
 services:
   - type: web
     name: fantasybooks

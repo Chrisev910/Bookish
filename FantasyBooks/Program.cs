@@ -2,6 +2,7 @@ using System.Globalization;
 using FantasyBooks.Data;
 using FantasyBooks.Options;
 using FantasyBooks.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -19,6 +20,7 @@ if (builder.Environment.IsDevelopment())
 
 ApplyStripeFromEnvironment(builder.Configuration);
 ApplyPublicBaseUrlFromEnvironment(builder.Configuration);
+ApplyAdminFromEnvironment(builder.Configuration);
 
 var resolvedStripeSecretKey = StripeSecretResolver.ResolveSecretKey(builder.Configuration);
 StripeConfiguration.ApiKey = resolvedStripeSecretKey;
@@ -50,8 +52,7 @@ builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = 20 * 1024 * 1024;
 });
 
-builder.Services.AddDbContext<LibraryContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Library")));
+builder.Services.AddLibraryDatabase(builder.Configuration);
 
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
 builder.Services.PostConfigure<StripeOptions>(opts =>
@@ -62,6 +63,9 @@ builder.Services.PostConfigure<StripeOptions>(opts =>
     if (string.IsNullOrWhiteSpace(opts.PublishableKey))
         opts.PublishableKey = StripeSecretResolver.ResolvePublishableKey(builder.Configuration);
 });
+
+builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+
 // Behind Render, Request.IsHttps can still be wrong when cookies are written. SameAsRequest
 // avoids dropping Secure session/antiforgery cookies on the internal HTTP hop.
 var cookieSecurePolicy = builder.Environment.IsDevelopment() || runningBehindProxy
@@ -88,7 +92,29 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SecurePolicy = cookieSecurePolicy;
 });
 
-builder.Services.AddRazorPages();
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Admin/Login";
+        options.LogoutPath = "/Admin/Logout";
+        options.AccessDeniedPath = "/Admin/Login";
+        options.Cookie.Name = ".FantasyBooks.Admin";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = cookieSecurePolicy;
+        options.ExpireTimeSpan = TimeSpan.FromDays(14);
+        options.SlidingExpiration = true;
+    });
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeFolder("/Admin");
+    options.Conventions.AllowAnonymousToPage("/Admin/Login");
+    options.Conventions.AllowAnonymousToPage("/Admin/Logout");
+});
 builder.Services.AddControllersWithViews();
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
@@ -121,10 +147,18 @@ if (string.IsNullOrWhiteSpace(resolvedStripeSecretKey) && app.Environment.IsProd
 
 using (var scope = app.Services.CreateScope())
 {
+    var dbInfo = scope.ServiceProvider.GetRequiredService<LibraryDatabaseInfo>();
     var context = scope.ServiceProvider.GetRequiredService<LibraryContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("FantasyBooks.Database");
+    logger.LogInformation("Library database: {Description}", dbInfo.Description);
+
     context.Database.EnsureCreated();
-    await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout = 5000;");
-    await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode = WAL;");
+    if (!dbInfo.IsRemoteTurso)
+    {
+        await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout = 5000;");
+        await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode = WAL;");
+    }
+
     await LibrarySchemaPatch.ApplyAsync(context);
     SeedData.Initialize(context);
 }
@@ -158,6 +192,7 @@ app.UseRequestLocalization();
 
 app.UseSession();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
@@ -197,6 +232,40 @@ static void ApplyPublicBaseUrlFromEnvironment(ConfigurationManager config)
             ["App:PublicBaseUrl"] = renderUrl.TrimEnd('/'),
         });
     }
+}
+
+static void ApplyAdminFromEnvironment(ConfigurationManager config)
+{
+    var updates = new Dictionary<string, string?>();
+
+    if (string.IsNullOrWhiteSpace(config["Admin:Username"]))
+    {
+        var user = Environment.GetEnvironmentVariable("ADMIN_USERNAME")
+            ?? Environment.GetEnvironmentVariable("Admin__Username");
+        if (!string.IsNullOrWhiteSpace(user))
+            updates["Admin:Username"] = user.Trim();
+    }
+
+    if (string.IsNullOrWhiteSpace(config["Admin:Password"]))
+    {
+        var pass = Environment.GetEnvironmentVariable("ADMIN_PASSWORD")
+            ?? Environment.GetEnvironmentVariable("Admin__Password");
+        if (!string.IsNullOrWhiteSpace(pass))
+            updates["Admin:Password"] = pass;
+    }
+
+    var tursoUrl = Environment.GetEnvironmentVariable("TURSO_DATABASE_URL")
+        ?? Environment.GetEnvironmentVariable("Turso__DatabaseUrl");
+    if (!string.IsNullOrWhiteSpace(tursoUrl) && string.IsNullOrWhiteSpace(config["Turso:DatabaseUrl"]))
+        updates["Turso:DatabaseUrl"] = tursoUrl.Trim();
+
+    var tursoToken = Environment.GetEnvironmentVariable("TURSO_AUTH_TOKEN")
+        ?? Environment.GetEnvironmentVariable("Turso__AuthToken");
+    if (!string.IsNullOrWhiteSpace(tursoToken) && string.IsNullOrWhiteSpace(config["Turso:AuthToken"]))
+        updates["Turso:AuthToken"] = tursoToken.Trim();
+
+    if (updates.Count > 0)
+        config.AddInMemoryCollection(updates);
 }
 
 static string ResolveDataProtectionKeysDirectory(string contentRootPath)

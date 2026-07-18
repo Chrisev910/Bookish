@@ -1,0 +1,18 @@
+@page "{id:int}"
+@model FantasyBooks.Pages.Admin.Products.EditModel
+@{
+    ViewData["Title"] = "Edit product";
+    ViewData.TemplateInfo.HtmlFieldPrefix = "Input";
+    ViewData["EditProductId"] = Model.Id;
+}
+
+<div class="mx-auto max-w-xl space-y-8 pb-8">
+    <header class="rounded-2xl border border-ink/10 bg-white/35 px-6 py-8 text-center shadow-float backdrop-blur-[10px]">
+        <h1 class="font-display text-3xl font-semibold text-ink">Edit product</h1>
+        <div class="mt-6">
+            <partial name="../_AdminNav" />
+        </div>
+    </header>
+
+    <partial name="_ProductForm" model="Model.Input" />
+</div>

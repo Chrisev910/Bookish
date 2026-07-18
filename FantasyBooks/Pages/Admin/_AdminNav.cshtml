@@ -1,0 +1,23 @@
+@{
+    var dbInfo = ViewData["LibraryDatabase"] as string;
+}
+<nav class="flex flex-wrap items-center justify-center gap-3 text-sm sm:justify-between">
+    <div class="flex flex-wrap items-center justify-center gap-3">
+        <a asp-page="/Admin/Products/Index" class="font-semibold text-ink/70 transition hover:text-gold-600">Products</a>
+        <span class="text-ink/25" aria-hidden="true">·</span>
+        <a asp-page="/Admin/Import" class="font-semibold text-ink/70 transition hover:text-gold-600">Import</a>
+        <span class="text-ink/25" aria-hidden="true">·</span>
+        <a asp-page="/Admin/Sync" class="font-semibold text-ink/70 transition hover:text-gold-600">Sync</a>
+        <span class="text-ink/25" aria-hidden="true">·</span>
+        <a asp-page="/Catalog" class="font-semibold text-ink/70 transition hover:text-gold-600">Shop</a>
+    </div>
+    <div class="flex flex-wrap items-center justify-center gap-3">
+        @if (!string.IsNullOrEmpty(dbInfo))
+        {
+            <span class="text-xs text-ink/45">DB: @dbInfo</span>
+        }
+        <form method="post" asp-page="/Admin/Logout" class="inline">
+            <button type="submit" class="text-xs font-semibold uppercase tracking-wider text-ink/50 transition hover:text-gold-600">Sign out</button>
+        </form>
+    </div>
+</nav>

@@ -13,11 +13,13 @@ public class ImportModel : PageModel
 {
     private readonly TikTokIntegrationService _tikTok;
     private readonly LibraryContext _db;
+    private readonly LibraryDatabaseInfo _dbInfo;
 
-    public ImportModel(TikTokIntegrationService tikTok, LibraryContext db)
+    public ImportModel(TikTokIntegrationService tikTok, LibraryContext db, LibraryDatabaseInfo dbInfo)
     {
         _tikTok = tikTok;
         _db = db;
+        _dbInfo = dbInfo;
     }
 
     [BindProperty]
@@ -33,6 +35,7 @@ public class ImportModel : PageModel
     public void OnGet()
     {
         FlashMessage = TempData["FlashMessage"] as string;
+        ViewData["LibraryDatabase"] = _dbInfo.Description;
     }
 
     public async Task<IActionResult> OnPostCastSyncSpellAsync(CancellationToken cancellationToken)

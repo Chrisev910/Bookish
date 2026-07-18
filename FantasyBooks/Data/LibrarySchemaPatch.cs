@@ -67,9 +67,11 @@ public static class LibrarySchemaPatch
         {
             await db.Database.ExecuteSqlRawAsync(alterSql, cancellationToken);
         }
-        catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+        catch (Exception ex) when (ex is SqliteException || ex.GetType().Name.Contains("LibSQL", StringComparison.Ordinal))
         {
-            // Already applied
+            if (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+                return;
+            throw;
         }
     }
 
@@ -85,9 +87,9 @@ public static class LibrarySchemaPatch
                 """,
                 cancellationToken);
         }
-        catch (SqliteException)
+        catch (Exception)
         {
-            // Column or table missing on very old DBs
+            // Column or table missing on very old DBs / remote libSQL quirks
         }
     }
 
@@ -128,9 +130,9 @@ public static class LibrarySchemaPatch
             };
             await db.Database.ExecuteSqlRawAsync(dropSql, cancellationToken);
         }
-        catch (SqliteException)
+        catch (Exception)
         {
-            // Older SQLite or unexpected schema — leave table as-is
+            // Older SQLite / remote libSQL or unexpected schema — leave table as-is
         }
     }
 }

@@ -1,0 +1,95 @@
+@page "/Admin/Products"
+@model FantasyBooks.Pages.Admin.Products.IndexModel
+@{
+    ViewData["Title"] = "Products";
+    ViewData["LibraryDatabase"] = Model.DatabaseDescription;
+}
+
+<div class="mx-auto max-w-4xl space-y-8 pb-8">
+    @if (!string.IsNullOrEmpty(Model.FlashMessage))
+    {
+        <div class="rounded-2xl border border-ink/12 bg-white/45 px-5 py-4 text-sm font-medium text-ink shadow-float backdrop-blur-[10px] ring-1 ring-gold-500/20" role="status">
+            @Model.FlashMessage
+        </div>
+    }
+
+    <header class="rounded-2xl border border-ink/10 bg-white/35 px-6 py-8 text-center shadow-float backdrop-blur-[10px] sm:px-10">
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-ink/45">Ledger</p>
+        <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Products</h1>
+        <p class="mx-auto mt-3 max-w-xl text-sm text-ink/60">Create and edit catalog items. Images use a public URL (no local uploads on free hosting).</p>
+        <div class="mt-6">
+            <partial name="../_AdminNav" />
+        </div>
+    </header>
+
+    <div class="flex justify-center">
+        <a asp-page="./Create"
+           class="magical-glow-btn rounded-xl bg-gold-500 px-7 py-3 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600">
+            Add product
+        </a>
+    </div>
+
+    @if (Model.Products.Count == 0)
+    {
+        <p class="rounded-2xl border border-dashed border-ink/15 bg-white/35 px-6 py-12 text-center text-ink/60 backdrop-blur-sm">
+            No products yet. <a asp-page="./Create" class="font-semibold text-ink underline decoration-gold-500/55">Add one</a> or import from TikTok.
+        </p>
+    }
+    else
+    {
+        <div class="overflow-hidden rounded-2xl border border-ink/10 bg-white/35 shadow-float backdrop-blur-[10px]">
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-ink/10 bg-white/40 text-xs font-semibold uppercase tracking-wider text-ink/50">
+                        <th class="px-4 py-3">Item</th>
+                        <th class="px-3 py-3 text-right">Price</th>
+                        <th class="px-4 py-3 text-right"><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ink/10">
+                    @foreach (var p in Model.Products)
+                    {
+                        <tr class="text-ink">
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    @if (!string.IsNullOrWhiteSpace(p.ImageUrl))
+                                    {
+                                        <img src="@p.ImageUrl" alt="" class="h-12 w-12 rounded-lg object-cover ring-1 ring-ink/10" loading="lazy" />
+                                    }
+                                    else
+                                    {
+                                        <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-ink/5 text-ink/25" aria-hidden="true">✦</div>
+                                    }
+                                    <div>
+                                        <p class="font-medium">@p.Name</p>
+                                        @if (!string.IsNullOrWhiteSpace(p.TikTokId))
+                                        {
+                                            <p class="font-mono text-xs text-ink/45">TT @p.TikTokId</p>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-3 py-3 text-right tabular-nums font-semibold">@p.Price.ToString("C")</td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                    <a asp-page="./Edit" asp-route-id="@p.Id"
+                                       class="rounded-lg border border-ink/15 bg-white/50 px-2.5 py-1 text-xs font-medium text-ink/70 transition hover:border-gold-500/40 hover:text-gold-600">
+                                        Edit
+                                    </a>
+                                    <form method="post" asp-page-handler="Delete" class="inline"
+                                          onsubmit="return confirm('Delete this product?');">
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                        <button type="submit"
+                                                class="rounded-lg border border-ink/15 bg-white/50 px-2.5 py-1 text-xs font-medium text-ink/70 transition hover:border-red-400/50 hover:text-red-700">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

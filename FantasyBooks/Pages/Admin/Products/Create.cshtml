@@ -1,0 +1,18 @@
+@page
+@model FantasyBooks.Pages.Admin.Products.CreateModel
+@{
+    ViewData["Title"] = "Add product";
+    ViewData.TemplateInfo.HtmlFieldPrefix = "Input";
+}
+
+<div class="mx-auto max-w-xl space-y-8 pb-8">
+    <header class="rounded-2xl border border-ink/10 bg-white/35 px-6 py-8 text-center shadow-float backdrop-blur-[10px]">
+        <h1 class="font-display text-3xl font-semibold text-ink">Add product</h1>
+        <p class="mt-2 text-sm text-ink/60">Fill in the details. Use a public image URL for the cover.</p>
+        <div class="mt-6">
+            <partial name="../_AdminNav" />
+        </div>
+    </header>
+
+    <partial name="_ProductForm" model="Model.Input" />
+</div>
