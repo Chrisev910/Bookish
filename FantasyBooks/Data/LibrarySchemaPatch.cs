@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -50,6 +51,10 @@ public static class LibrarySchemaPatch
         }
     }
 
+    /// <summary>
+    /// Uses ADO.NET on the open connection instead of EF <c>ExecuteSqlRaw</c>,
+    /// which NREs with the Turso/LibSQL connection wrapper.
+    /// </summary>
     private static async Task TryExecAsync(
         LibraryContext db,
         string sql,
@@ -58,12 +63,18 @@ public static class LibrarySchemaPatch
     {
         try
         {
-            await db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                await conn.OpenAsync(cancellationToken);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
         }
         catch (Exception ex)
         {
             // Duplicate column / missing legacy column / Turso DDL quirks — never fail startup.
-            logger?.LogDebug(ex, "Schema patch statement skipped: {Sql}", sql.Trim());
+            logger?.LogWarning(ex, "Schema patch statement skipped: {Sql}", sql.ReplaceLineEndings(" ").Trim());
         }
     }
 }
