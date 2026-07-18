@@ -255,3 +255,7 @@ body.noise-root {
 .tiktok-embed-host iframe {
   max-width: 100% !important;
 }
+
+.product-tiktok-embed .tiktok-embed-host {
+  padding: 0.75rem 0.75rem 0;
+}

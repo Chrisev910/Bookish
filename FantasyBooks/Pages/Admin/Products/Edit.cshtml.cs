@@ -36,6 +36,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
                 p.ImageUrl,
                 p.ImageContentType,
                 p.TikTokId,
+                p.TikTokVideoUrl,
             })
             .FirstOrDefaultAsync(cancellationToken);
         if (product is null)
@@ -50,6 +51,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             Price = product.Price,
             ImageUrl = product.ImageUrl,
             TikTokId = product.TikTokId,
+            TikTokVideoUrl = product.TikTokVideoUrl,
         };
         CurrentImageSrc = !string.IsNullOrWhiteSpace(product.ImageContentType)
             ? $"/media/products/{product.Id}"
@@ -69,6 +71,14 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
             ModelState.AddModelError("Input.ImageUrl", "Enter a valid http(s) image URL, or leave blank.");
         }
 
+        if (!string.IsNullOrWhiteSpace(Input.TikTokVideoUrl)
+            && (!Uri.TryCreate(Input.TikTokVideoUrl.Trim(), UriKind.Absolute, out var videoUri)
+                || (videoUri.Scheme != Uri.UriSchemeHttp && videoUri.Scheme != Uri.UriSchemeHttps)
+                || !videoUri.Host.Contains("tiktok", StringComparison.OrdinalIgnoreCase)))
+        {
+            ModelState.AddModelError("Input.TikTokVideoUrl", "Enter a full TikTok video URL, or leave blank.");
+        }
+
         if (!ModelState.IsValid)
         {
             CurrentImageSrc = ViewData["CurrentImageSrc"] as string;
@@ -86,6 +96,7 @@ public class EditModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMode
         product.Description = DescriptionHtml.Sanitize(Input.Description);
         product.Price = Input.Price;
         product.TikTokId = NullIfEmpty(Input.TikTokId);
+        product.TikTokVideoUrl = NullIfEmpty(Input.TikTokVideoUrl);
 
         byte[]? newImageData = null;
         string? newImageContentType = null;

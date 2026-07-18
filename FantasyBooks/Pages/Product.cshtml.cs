@@ -11,14 +11,19 @@ public class ProductModel : PageModel
 {
     private readonly LibraryContext _context;
     private readonly CartService _cart;
+    private readonly TikTokOEmbedService _oEmbed;
 
-    public ProductModel(LibraryContext context, CartService cart)
+    public ProductModel(LibraryContext context, CartService cart, TikTokOEmbedService oEmbed)
     {
         _context = context;
         _cart = cart;
+        _oEmbed = oEmbed;
     }
 
     public Product? ProductDetail { get; private set; }
+
+    /// <summary>TikTok oEmbed HTML when the product has a video; otherwise null (section omitted).</summary>
+    public string? TikTokEmbedHtml { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
@@ -29,6 +34,7 @@ public class ProductModel : PageModel
             {
                 Id = p.Id,
                 TikTokId = p.TikTokId,
+                TikTokVideoUrl = p.TikTokVideoUrl,
                 Name = p.Name,
                 ImageUrl = p.ImageUrl,
                 ImageContentType = p.ImageContentType,
@@ -37,7 +43,13 @@ public class ProductModel : PageModel
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return ProductDetail is null ? NotFound() : Page();
+        if (ProductDetail is null)
+            return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(ProductDetail.TikTokVideoUrl))
+            TikTokEmbedHtml = await _oEmbed.GetEmbedHtmlAsync(ProductDetail.TikTokVideoUrl, cancellationToken);
+
+        return Page();
     }
 
     public IActionResult OnPostAddToCart(int productId)

@@ -34,6 +34,7 @@ public static class LibrarySchemaPatch
         // Ensure critical image columns exist (ALTER can be skipped silently on some Turso errors).
         await EnsureColumnAsync(db, "Products", "ImageContentType", """ALTER TABLE "Products" ADD COLUMN "ImageContentType" TEXT NULL;""", logger, cancellationToken);
         await EnsureColumnAsync(db, "Products", "ImageData", """ALTER TABLE "Products" ADD COLUMN "ImageData" BLOB NULL;""", logger, cancellationToken);
+        await EnsureColumnAsync(db, "Products", "TikTokVideoUrl", """ALTER TABLE "Products" ADD COLUMN "TikTokVideoUrl" TEXT NULL;""", logger, cancellationToken);
 
         await TryExecAsync(
             db,

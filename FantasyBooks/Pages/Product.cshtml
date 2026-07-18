@@ -39,6 +39,20 @@
                     </div>
                 }
             }
+
+            @if (!string.IsNullOrWhiteSpace(Model.TikTokEmbedHtml))
+            {
+                <section class="border-t border-ink/10 pt-6" aria-label="Related TikTok">
+                    <p class="text-xs font-semibold uppercase tracking-[0.28em] text-gold-600">See it in motion</p>
+                    <h2 class="mt-1 font-display text-xl font-semibold text-ink">On TikTok</h2>
+                    <div class="product-tiktok-embed mt-4 overflow-hidden rounded-2xl border border-ink/10 bg-white/50 shadow-inner">
+                        <div class="tiktok-embed-host mx-auto max-w-sm">
+                            @Html.Raw(Model.TikTokEmbedHtml)
+                        </div>
+                    </div>
+                </section>
+            }
+
             <div class="border-t border-ink/10 pt-6">
                 <form method="post" asp-page="/Product" asp-route-id="@p.Id" asp-page-handler="AddToCart" class="flex flex-wrap items-center gap-4">
                     <input type="hidden" name="productId" value="@p.Id" />

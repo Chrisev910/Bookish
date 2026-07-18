@@ -57,6 +57,13 @@
         <span asp-validation-for="TikTokId" class="mt-1 block text-xs text-red-700"></span>
         <p class="mt-1 text-xs text-ink/45">Optional — used when syncing with TikTok imports.</p>
     </div>
+    <div>
+        <label asp-for="TikTokVideoUrl" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>
+        <input asp-for="TikTokVideoUrl" placeholder="https://www.tiktok.com/@@account/video/…"
+               class="w-full rounded-xl border border-ink/15 bg-white/60 px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-gold-500/30" />
+        <span asp-validation-for="TikTokVideoUrl" class="mt-1 block text-xs text-red-700"></span>
+        <p class="mt-1 text-xs text-ink/45">Optional — when set, an embed appears on this product’s shop page. Leave blank if there isn’t one.</p>
+    </div>
     <div class="flex flex-wrap items-center gap-4 pt-2">
         <button type="submit" class="magical-glow-btn rounded-xl bg-gold-500 px-7 py-3 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-600">
             Save product

@@ -35,6 +35,8 @@ public class LibraryContext : DbContext
 
             entity.Property(e => e.TikTokId).HasColumnType("TEXT");
 
+            entity.Property(e => e.TikTokVideoUrl).HasMaxLength(2000).HasColumnType("TEXT");
+
             entity.Property(e => e.Price).HasPrecision(18, 2);
         });
 

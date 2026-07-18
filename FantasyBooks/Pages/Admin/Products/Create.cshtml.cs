@@ -24,6 +24,7 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
     {
         ViewData["LibraryDatabase"] = dbInfo.Description;
         ValidateImageUrl();
+        ValidateTikTokVideoUrl();
         if (!ModelState.IsValid)
             return Page();
 
@@ -54,6 +55,7 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
             Price = Input.Price,
             ImageUrl = imageData is null ? NullIfEmpty(Input.ImageUrl) : null,
             TikTokId = NullIfEmpty(Input.TikTokId),
+            TikTokVideoUrl = NullIfEmpty(Input.TikTokVideoUrl),
         };
         db.Products.Add(product);
         await db.SaveChangesAsync(cancellationToken);
@@ -75,6 +77,18 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
             ModelState.AddModelError("Input.ImageUrl", "Enter a valid http(s) image URL, or leave blank.");
+        }
+    }
+
+    private void ValidateTikTokVideoUrl()
+    {
+        if (string.IsNullOrWhiteSpace(Input.TikTokVideoUrl))
+            return;
+        if (!Uri.TryCreate(Input.TikTokVideoUrl.Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            || !uri.Host.Contains("tiktok", StringComparison.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError("Input.TikTokVideoUrl", "Enter a full TikTok video URL, or leave blank.");
         }
     }
 
@@ -103,5 +117,9 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
         [Display(Name = "TikTok product ID")]
         [StringLength(100)]
         public string? TikTokId { get; set; }
+
+        [Display(Name = "Product TikTok video (optional)")]
+        [StringLength(2000)]
+        public string? TikTokVideoUrl { get; set; }
     }
 }

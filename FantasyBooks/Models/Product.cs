@@ -7,6 +7,9 @@ public class Product
     /// <summary>TikTok Shop product identifier — used for upserts and duplicate prevention.</summary>
     public string? TikTokId { get; set; }
 
+    /// <summary>Optional TikTok video URL related to this product (shown on the product page when set).</summary>
+    public string? TikTokVideoUrl { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     /// <summary>External image URL (TikTok CDN, etc.). Used when no uploaded file is stored.</summary>

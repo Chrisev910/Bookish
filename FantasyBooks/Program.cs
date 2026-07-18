@@ -2,7 +2,6 @@ using System.Globalization;
 using FantasyBooks.Data;
 using FantasyBooks.Options;
 using FantasyBooks.Services;
-using FantasyBooks.ViewComponents;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -113,7 +112,7 @@ builder.Services.AddHttpClient(ProductRemoteImageFetcher.HttpClientName, client 
     client.DefaultRequestHeaders.UserAgent.ParseAdd(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 });
-builder.Services.AddHttpClient(TikTokFooterFeedViewComponent.HttpClientName, client =>
+builder.Services.AddHttpClient(TikTokOEmbedService.HttpClientName, client =>
 {
     client.Timeout = TimeSpan.FromSeconds(8);
     client.DefaultRequestHeaders.UserAgent.ParseAdd(
@@ -123,6 +122,7 @@ builder.Services.AddHttpClient(TikTokFeedSyncService.HttpClientName, client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddScoped<TikTokOEmbedService>();
 builder.Services.AddScoped<ProductRemoteImageFetcher>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<StripeCheckoutService>();
