@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY FantasyBooks/FantasyBooks.csproj FantasyBooks/
 RUN dotnet restore FantasyBooks/FantasyBooks.csproj
@@ -7,7 +7,7 @@ COPY FantasyBooks/ FantasyBooks/
 WORKDIR /src/FantasyBooks
 RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 # Default aspnet image runs the app as non-root; /app is root-owned after COPY,
