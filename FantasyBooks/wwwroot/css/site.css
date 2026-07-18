@@ -173,3 +173,70 @@ body.noise-root {
     0 0 0 3px rgba(197, 160, 89, 0.28),
     0 0 22px rgba(197, 160, 89, 0.1);
 }
+
+/* Product page rich description (sanitized HTML) */
+.product-description p {
+  margin: 0 0 0.85em;
+}
+
+.product-description p:last-child {
+  margin-bottom: 0;
+}
+
+.product-description h2,
+.product-description h3 {
+  margin: 1.1em 0 0.45em;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.product-description h2 {
+  font-size: 1.2em;
+}
+
+.product-description h3 {
+  font-size: 1.05em;
+}
+
+.product-description ul,
+.product-description ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.35em;
+}
+
+.product-description li {
+  margin: 0.2em 0;
+}
+
+.product-description a {
+  color: #8b6914;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.product-description a:hover {
+  color: #0f172a;
+}
+
+/* Admin Quill editor */
+.description-quill-wrap .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(248, 245, 242, 0.55);
+}
+
+.description-quill-wrap .ql-container.ql-snow {
+  border: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.description-quill-wrap .ql-editor {
+  min-height: 12rem;
+}
+
+.description-quill-wrap .ql-editor.ql-blank::before {
+  color: rgba(15, 23, 42, 0.38);
+  font-style: normal;
+}

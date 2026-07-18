@@ -1,6 +1,6 @@
 @model FantasyBooks.Pages.Admin.Products.CreateModel.ProductInput
 
-<form method="post" enctype="multipart/form-data" class="space-y-5 rounded-2xl border border-ink/10 bg-white/35 p-6 shadow-float backdrop-blur-[10px] sm:p-8">
+<form method="post" enctype="multipart/form-data" class="space-y-5 rounded-2xl border border-ink/10 bg-white/35 p-6 shadow-float backdrop-blur-[10px] sm:p-8" id="product-form">
     @if (ViewData["EditProductId"] is int editId)
     {
         <input type="hidden" name="Id" value="@editId" />
@@ -43,11 +43,12 @@
     </div>
     <div>
         <label asp-for="Description" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>
-        <textarea asp-for="Description" rows="8"
-                  placeholder="Write a normal product description. Use blank lines between paragraphs — no HTML needed."
-                  class="w-full rounded-xl border border-ink/15 bg-white/60 px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-gold-500/30"></textarea>
+        <textarea asp-for="Description" id="Input_Description" rows="3" class="sr-only" tabindex="-1" aria-hidden="true"></textarea>
+        <div class="description-quill-wrap overflow-hidden rounded-xl border border-ink/15 bg-white/60">
+            <div id="description-editor" class="min-h-[12rem] text-sm text-ink"></div>
+        </div>
         <span asp-validation-for="Description" class="mt-1 block text-xs text-red-700"></span>
-        <p class="mt-1 text-xs text-ink/45">Plain text only. Line breaks are kept on the product page. You do not need HTML tags.</p>
+        <p class="mt-1 text-xs text-ink/45">Use the toolbar to format. No HTML knowledge needed.</p>
     </div>
     <div>
         <label asp-for="TikTokId" class="mb-2 block text-xs font-semibold uppercase tracking-widest text-gold-600"></label>

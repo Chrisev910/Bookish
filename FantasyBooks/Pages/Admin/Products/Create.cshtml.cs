@@ -50,7 +50,7 @@ public class CreateModel(LibraryContext db, LibraryDatabaseInfo dbInfo) : PageMo
         db.Products.Add(new Product
         {
             Name = Input.Name.Trim(),
-            Description = HtmlPlainText.ForEditor(Input.Description),
+            Description = DescriptionHtml.Sanitize(Input.Description),
             Price = Input.Price,
             ImageUrl = imageData is null ? NullIfEmpty(Input.ImageUrl) : null,
             ImageData = imageData,
