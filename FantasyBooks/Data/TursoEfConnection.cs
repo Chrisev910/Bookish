@@ -6,7 +6,7 @@ namespace FantasyBooks.Data;
 
 /// <summary>
 /// Wraps <see cref="LibSQLConnection"/> so EF Core's SQLite provider never sees Turso's
-/// <c>Auth Token</c> keyword (Microsoft.Data.Sqlite rejects it).
+/// <c>AuthToken</c> keyword, and so commands/transactions report this connection (not the inner one).
 /// </summary>
 public sealed class TursoEfConnection : DbConnection
 {
@@ -19,9 +19,10 @@ public sealed class TursoEfConnection : DbConnection
         ArgumentException.ThrowIfNullOrWhiteSpace(authToken);
 
         _efConnectionString = $"Data Source={httpsDataSource.Trim()}";
-        // Nelknet accepts AuthToken (alias of Auth Token); keep it off the string EF inspects.
         _inner = new LibSQLConnection($"Data Source={httpsDataSource.Trim()};AuthToken={authToken.Trim()}");
     }
+
+    internal LibSQLConnection Inner => _inner;
 
     public override string ConnectionString
     {
@@ -55,9 +56,10 @@ public sealed class TursoEfConnection : DbConnection
     public override Task CloseAsync() => _inner.CloseAsync();
 
     protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) =>
-        _inner.BeginTransaction(isolationLevel);
+        new TursoEfTransaction(_inner.BeginTransaction(isolationLevel), this);
 
-    protected override DbCommand CreateDbCommand() => _inner.CreateCommand();
+    protected override DbCommand CreateDbCommand() =>
+        new TursoEfCommand(_inner.CreateCommand(), this);
 
     protected override void Dispose(bool disposing)
     {
@@ -66,8 +68,136 @@ public sealed class TursoEfConnection : DbConnection
         base.Dispose(disposing);
     }
 
-    public override ValueTask DisposeAsync()
+    public override ValueTask DisposeAsync() => _inner.DisposeAsync();
+}
+
+internal sealed class TursoEfTransaction(DbTransaction inner, TursoEfConnection owner) : DbTransaction
+{
+    private bool _disposed;
+
+    protected override DbConnection DbConnection => owner;
+
+    public override IsolationLevel IsolationLevel => inner.IsolationLevel;
+
+    internal DbTransaction Inner => inner;
+
+    public override void Commit() => inner.Commit();
+
+    public override void Rollback() => inner.Rollback();
+
+    public override Task CommitAsync(CancellationToken cancellationToken = default) =>
+        inner.CommitAsync(cancellationToken);
+
+    public override Task RollbackAsync(CancellationToken cancellationToken = default) =>
+        inner.RollbackAsync(cancellationToken);
+
+    protected override void Dispose(bool disposing)
     {
-        return _inner.DisposeAsync();
+        if (!_disposed && disposing)
+        {
+            inner.Dispose();
+            _disposed = true;
+        }
+
+        base.Dispose(disposing);
+    }
+}
+
+internal sealed class TursoEfCommand(DbCommand inner, TursoEfConnection owner) : DbCommand
+{
+    private TursoEfTransaction? _transaction;
+
+    public override string CommandText
+    {
+        get => inner.CommandText;
+        set => inner.CommandText = value;
+    }
+
+    public override int CommandTimeout
+    {
+        get => inner.CommandTimeout;
+        set => inner.CommandTimeout = value;
+    }
+
+    public override CommandType CommandType
+    {
+        get => inner.CommandType;
+        set => inner.CommandType = value;
+    }
+
+    public override bool DesignTimeVisible
+    {
+        get => inner.DesignTimeVisible;
+        set => inner.DesignTimeVisible = value;
+    }
+
+    public override UpdateRowSource UpdatedRowSource
+    {
+        get => inner.UpdatedRowSource;
+        set => inner.UpdatedRowSource = value;
+    }
+
+    protected override DbConnection? DbConnection
+    {
+        get => owner;
+        set
+        {
+            if (value is null || ReferenceEquals(value, owner))
+                return;
+            throw new InvalidOperationException("TursoEfCommand is bound to its owner connection.");
+        }
+    }
+
+    protected override DbParameterCollection DbParameterCollection => inner.Parameters;
+
+    protected override DbTransaction? DbTransaction
+    {
+        get => _transaction;
+        set
+        {
+            _transaction = value as TursoEfTransaction;
+            if (value is null)
+            {
+                inner.Transaction = null;
+                return;
+            }
+
+            if (_transaction is null)
+                throw new InvalidOperationException("Transaction must be created from the Turso connection.");
+
+            // Enlist the inner command on the inner LibSQL transaction.
+            inner.Transaction = _transaction.Inner;
+        }
+    }
+
+    public override void Cancel() => inner.Cancel();
+
+    public override int ExecuteNonQuery() => inner.ExecuteNonQuery();
+
+    public override object? ExecuteScalar() => inner.ExecuteScalar();
+
+    public override void Prepare() => inner.Prepare();
+
+    protected override DbParameter CreateDbParameter() => inner.CreateParameter();
+
+    protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) =>
+        inner.ExecuteReader(behavior);
+
+    public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) =>
+        inner.ExecuteNonQueryAsync(cancellationToken);
+
+    public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) =>
+        inner.ExecuteScalarAsync(cancellationToken);
+
+    protected override Task<DbDataReader> ExecuteDbDataReaderAsync(
+        CommandBehavior behavior,
+        CancellationToken cancellationToken) =>
+        inner.ExecuteReaderAsync(behavior, cancellationToken);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            inner.Dispose();
+        base.Dispose(disposing);
     }
 }
