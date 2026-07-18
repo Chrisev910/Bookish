@@ -67,6 +67,26 @@ builder.Services.PostConfigure<StripeOptions>(opts =>
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
 builder.Services.Configure<TikTokFeedOptions>(builder.Configuration.GetSection(TikTokFeedOptions.SectionName));
+builder.Services.PostConfigure<TikTokFeedOptions>(opts =>
+{
+    // Always prefer process env (Render) over empty appsettings placeholders.
+    var key =
+        FirstNonEmptyEnv(
+            "TikTokFeed__RapidApiKey",
+            "TIKTOK_FEED_RAPIDAPI_KEY",
+            "RAPIDAPI_KEY",
+            "TikTokFeed_RapidApiKey");
+    if (!string.IsNullOrWhiteSpace(key))
+        opts.RapidApiKey = key.Trim();
+
+    var user =
+        FirstNonEmptyEnv(
+            "TikTokFeed__Username",
+            "TIKTOK_FEED_USERNAME",
+            "TikTokFeed_Username");
+    if (!string.IsNullOrWhiteSpace(user))
+        opts.Username = user.Trim().TrimStart('@');
+});
 
 // Behind Render, Request.IsHttps can still be wrong when cookies are written. SameAsRequest
 // avoids dropping Secure session/antiforgery cookies on the internal HTTP hop.
@@ -286,18 +306,32 @@ static void ApplyAdminFromEnvironment(ConfigurationManager config)
     if (!string.IsNullOrWhiteSpace(tursoToken) && string.IsNullOrWhiteSpace(config["Turso:AuthToken"]))
         updates["Turso:AuthToken"] = tursoToken.Trim();
 
-    var feedUser = Environment.GetEnvironmentVariable("TIKTOK_FEED_USERNAME")
-        ?? Environment.GetEnvironmentVariable("TikTokFeed__Username");
-    if (!string.IsNullOrWhiteSpace(feedUser) && string.IsNullOrWhiteSpace(config["TikTokFeed:Username"]))
+    var feedUser = FirstNonEmptyEnv("TIKTOK_FEED_USERNAME", "TikTokFeed__Username", "TikTokFeed_Username");
+    if (!string.IsNullOrWhiteSpace(feedUser))
         updates["TikTokFeed:Username"] = feedUser.Trim().TrimStart('@');
 
-    var feedKey = Environment.GetEnvironmentVariable("TIKTOK_FEED_RAPIDAPI_KEY")
-        ?? Environment.GetEnvironmentVariable("TikTokFeed__RapidApiKey");
-    if (!string.IsNullOrWhiteSpace(feedKey) && string.IsNullOrWhiteSpace(config["TikTokFeed:RapidApiKey"]))
+    var feedKey = FirstNonEmptyEnv(
+        "TIKTOK_FEED_RAPIDAPI_KEY",
+        "TikTokFeed__RapidApiKey",
+        "RAPIDAPI_KEY",
+        "TikTokFeed_RapidApiKey");
+    if (!string.IsNullOrWhiteSpace(feedKey))
         updates["TikTokFeed:RapidApiKey"] = feedKey.Trim();
 
     if (updates.Count > 0)
         config.AddInMemoryCollection(updates);
+}
+
+static string? FirstNonEmptyEnv(params string[] names)
+{
+    foreach (var name in names)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        if (!string.IsNullOrWhiteSpace(value))
+            return value;
+    }
+
+    return null;
 }
 
 static string ResolveDataProtectionKeysDirectory(string contentRootPath)

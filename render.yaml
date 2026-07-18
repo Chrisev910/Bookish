@@ -16,7 +16,8 @@
 #
 # TikTok footer auto-sync (RapidAPI tiktok-scraper7):
 #   TikTokFeed__Username      or   TIKTOK_FEED_USERNAME     (handle without @)
-#   TikTokFeed__RapidApiKey   or   TIKTOK_FEED_RAPIDAPI_KEY
+#   TikTokFeed__RapidApiKey   or   TIKTOK_FEED_RAPIDAPI_KEY or RAPIDAPI_KEY
+# Use two underscores (__) between TikTokFeed and RapidApiKey — not a colon.
 #
 # RENDER_EXTERNAL_URL is set by Render and used for Stripe success/cancel links.
 # Optional override: App__PublicBaseUrl=https://your-service.onrender.com

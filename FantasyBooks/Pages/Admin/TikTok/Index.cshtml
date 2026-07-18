@@ -29,8 +29,8 @@
         <p class="mt-2 text-sm text-ink/60">
             Pulls the newest videos via RapidAPI (<span class="font-mono text-xs">tiktok-scraper7</span>) and replaces the footer list.
             @(Model.FeedApiConfigured
-                ? "API key is configured."
-                : "API key not set yet — add TikTokFeed__RapidApiKey on Render (see setup notes).")
+                ? "API key is configured on this server."
+                : "API key not detected. On Render use the exact name TikTokFeed__RapidApiKey (two underscores), save, then redeploy.")
         </p>
         <form method="post" asp-page-handler="SyncFeed" class="mt-5 space-y-5">
             <div>

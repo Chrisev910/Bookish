@@ -26,7 +26,7 @@ public sealed class TikTokFeedSyncService(
 
         if (string.IsNullOrWhiteSpace(opts.RapidApiKey))
             return TikTokFeedSyncResult.Fail(
-                "Missing RapidAPI key. Set TikTokFeed__RapidApiKey (or TikTokFeed:RapidApiKey) in the environment.");
+                "Missing RapidAPI key. In Render → Environment, set key name exactly to TikTokFeed__RapidApiKey (two underscores), paste the key as the value, then Manual Deploy → Deploy latest.");
 
         var take = Math.Clamp(opts.TakeCount <= 0 ? 4 : opts.TakeCount, 1, 12);
         var host = string.IsNullOrWhiteSpace(opts.RapidApiHost)
