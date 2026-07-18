@@ -223,6 +223,20 @@ public class StripeCheckoutService(
             {
                 AllowedCountries = new List<string> { "US", "CA", "GB", "AU", "NZ", "IE" },
             },
+            CustomFields =
+            [
+                new SessionCustomFieldOptions
+                {
+                    Key = "order_notes",
+                    Label = new SessionCustomFieldLabelOptions
+                    {
+                        Type = "custom",
+                        Custom = "Special requests / order notes",
+                    },
+                    Type = "text",
+                    Optional = true,
+                },
+            ],
             Metadata = metadata,
         };
 
