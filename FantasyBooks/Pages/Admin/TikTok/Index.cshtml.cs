@@ -113,10 +113,19 @@ public class IndexModel(
 
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
-        Videos = await db.TikTokVideos
-            .AsNoTracking()
-            .OrderByDescending(v => v.DateCreated)
-            .ToListAsync(cancellationToken);
+        try
+        {
+            Videos = await db.TikTokVideos
+                .AsNoTracking()
+                .OrderByDescending(v => v.DateCreated)
+                .ToListAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            // Corrupt/legacy date TEXT should not brick the admin page.
+            Videos = [];
+            FlashMessage ??= "Could not load saved videos (bad date format). Click Sync latest videos to rebuild the feed.";
+        }
     }
 
     public class InputModel

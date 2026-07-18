@@ -1,5 +1,7 @@
+using System.Globalization;
 using FantasyBooks.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace FantasyBooks.Data;
 
@@ -42,8 +44,35 @@ public class LibraryContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.VideoUrl).IsRequired().HasMaxLength(2000).HasColumnType("TEXT");
             entity.Property(e => e.IsActive).HasColumnType("INTEGER");
-            entity.Property(e => e.DateCreated).HasColumnType("TEXT");
+            // Store ISO-8601 so en-GB request culture cannot break reads of US-style TEXT dates from Turso/LibSQL.
+            entity.Property(e => e.DateCreated)
+                .HasColumnType("TEXT")
+                .HasConversion(new ValueConverter<DateTime, string>(
+                    v => v.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
+                    v => ParseUtcDateTime(v)));
             entity.HasIndex(e => new { e.IsActive, e.DateCreated });
         });
+    }
+
+    private static DateTime ParseUtcDateTime(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return DateTime.UtcNow;
+
+        var s = raw.Trim();
+        if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt)
+            || DateTime.TryParse(s, CultureInfo.GetCultureInfo("en-US"), DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt)
+            || DateTime.TryParse(s, CultureInfo.GetCultureInfo("en-GB"), DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt)
+            || DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt))
+        {
+            return dt.Kind switch
+            {
+                DateTimeKind.Utc => dt,
+                DateTimeKind.Local => dt.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
+            };
+        }
+
+        return DateTime.UtcNow;
     }
 }
